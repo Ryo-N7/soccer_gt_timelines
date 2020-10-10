@@ -20,9 +20,26 @@ knitr::opts_chunk$set(echo = TRUE)
 - sparkline timeline: no, cum xg covers that and can't see plot point easily in graph. also the nature of the chronological setup already means you get that aspect of the game anyways
 better to focus on something that's easier to see at first glance as highlights the main idea of the table >> shost. 
 
+# Data
+
+Data source: understat.com
+
+
 
 
 # Code Breakdown
+
+## Creating the soccer field plots
+
+
+## Combining plots to data frame
+
+
+## Actual table
+
+## Save online to RPubs
+
+
 
 
 

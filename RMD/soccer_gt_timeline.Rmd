@@ -4,6 +4,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+options(width = 5000)
 ```
 
 # packages
@@ -75,12 +76,13 @@ createTimelineTableGT <- function(
   
   ## create coords
   match_df <- shots_df %>% 
+    ## switch coordinates for vertical view
     mutate(x = case_when(
-      h_a == "a" ~ X * 587,#587 - (X * 587),
+      h_a == "a" ~ X * 587,
       h_a == "h" ~ X * 587,
       TRUE ~ 0),
       y = case_when(
-        h_a == "a" ~ Y * 373,#373 - (Y * 373),
+        h_a == "a" ~ Y * 373,
         h_a == "h" ~ Y * 373,
         TRUE ~ 0)) %>%
     select(minute, player, team_name, 
@@ -100,6 +102,7 @@ createTimelineTableGT <- function(
     shotxG_map_raw <- ggplot(df %>% filter(team_name == team_name), 
                              aes(x = x, y = y)) +
       annotate_pitch(dimensions = pitch_custom) +
+      ## all shots in grey and transparent
       geom_point(aes(x = x, y = y), color = "grey20", 
                  size = 3, alpha = 0.3) +
       scale_x_continuous(expand = c(0.01, 0)) +
@@ -122,10 +125,12 @@ createTimelineTableGT <- function(
                    "On Post" = "#004CFF")
     
     shotxG_map_point <- plot +
+      # specific shot point in black and bold
       geom_point(x = x, y = y, color = "black", 
                  size = 12) +
       scale_x_continuous(expand = c(0.01, 0)) +
       scale_color_manual(values = fill_cols, guide = NA) +
+      ## label for shot point
       geom_label(x = 318, y = 186.5, 
                  color = "black", size = 20,
                  fill = "white", family = "Roboto Slab",
@@ -137,56 +142,59 @@ createTimelineTableGT <- function(
   ## add blank shot map to all rows
   match_df_basic_plot <- match_df %>% 
     tibble::as_tibble() %>% 
+    ## nest by team
     group_by(team_name) %>% 
     nest() %>% 
+    ## add all shots per team for each row
     mutate(plot = map2(data, team_name, create_shotmap_basic))
   
   ## clean cumsum df
   match_rollsum_simple <- roll_sum_df %>% 
+    ## take out blank rows with xG = 0
     filter(xG != 0.00) %>% 
     select(minute_2 = minute, firstname, team_name, xG, minute_goal, rollsum_goal,
            situation, shotType, player_assisted, lastAction)
   
   ## join together cumsum df with plot df
+  ## this is so after 'basic plot' is turned into a nested df
+  ## the columns that were "lost" inside the nesting are added back in
   dfdf <- match_df %>% 
     left_join(match_df_basic_plot) %>% 
     left_join(match_rollsum_simple, 
               by = c("xG", "team_name", "minute" = "minute_2")) %>% 
+    ## make sure its in chrnological order
     arrange(minute)
   
   ## map plot to df again with a shot point for each row/plot
   dfdfdf <- dfdf %>% 
+    ## shot-per-row, using 'plot' as base pass along the 'x', 'y' coordinates and xG value
+    ## to "add_xG_shot()` function for each row. 
+    ## have empty 'ggplot' column for gt plot-insertion purposes
     mutate(complete_plot = pmap(list(x, y, xG, plot), add_xG_shot),
            ggplot = NA) %>% 
-    select(-plot, -minute_goal, -rollsum_goal)
+    select(-plot, -minute_goal, rollsum = rollsum_goal)
 
   ## data creation for actual table
   match_shots_table_df <- dfdfdf %>% 
     select(minute, team_name, result, xG, firstname, player, 
-           ggplot, complete_plot, 
+           ggplot, complete_plot, rollsum,
            situation, type = shotType, player_assisted, lastAction) %>% 
+    ## player name labels, clean "lastAction"
     mutate(player_name = paste(firstname, player),
-           lastAction = if_else(lastAction == "None", NA_character_, lastAction)) %>% ## empty ggplot col
-    group_by(team_name) %>% 
-    mutate(rollsum = cumsum(xG)) %>% 
-    ungroup() %>% 
+           lastAction = if_else(lastAction == "None", NA_character_, lastAction)) %>% 
+    ## NAs as blanks
     mutate(across(where(is.character), ~ replace_na(., ""))) %>% 
+    ## take out extraneous name vars and move to after team name
     select(-firstname, -player) %>% 
-    relocate(player_name, .after = team_name) %>% 
-    relocate(rollsum, .after = complete_plot)
+    relocate(player_name, .after = team_name) 
   
   ## currently a STAR symbol
   soccer_ball <- "<span style='color:white;font-size:25px'>&#9917;</span>"   #  style=\"color:white\"   &#9917; &#9734;
   # soccer_ball_url <- here::here(glue::glue("Premier League 2020-2021/img/soccer_ball.png"))
   # soccer_ball_png <- gt::html(glue("<img src='{soccer_ball_url}'>"))   # width='500' height='600'
-  
-  # home_team <- "Newcastle United"
-  # away_team <- "Liverpool"
-  # home_color = "#000000"
-  # away_color = "#d00027"
-  
-  match_gt_xG_timeline <- match_shots_table_df %>% 
-    gt() %>% 
+
+  match_gt_xG_timeline <- 
+    gt(match_shots_table_df) %>% 
     tab_header(   # <p><span style='font-size:40px'>Shots Timeline</span></p>
       title = gt::html(glue::glue("<p><img src='Liverpool_FC.png' alt='LFC' style='width:190px;vertical-align:middle;margin:50px 150px 50px 100px;'></span><img src='Leeds_United_FC.png' alt='LUFC' style='width:190px;vertical-align:middle;margin:50px 100px 50px 150px;'></p>")),
       #subtitle = gt::html(glue::glue("<span style='font-size:40px'>Premier League 2020-2021: Matchday 1 ({match_date})</span>"))
@@ -248,26 +256,28 @@ createTimelineTableGT <- function(
       style = cell_text(color = "white", align = "center", size = "x-large",
                         font = "Roboto Condensed", weight = "bold"),
       locations = cells_body(
-        columns = TRUE) # vars(team_name)
+        columns = TRUE) 
     ) %>% 
-    ## add Goal result emoji
+    ## add Goal result emoji by pasting in the emoji next to the 'result' text
     text_transform(
       locations = cells_body(
         columns = vars(result),
         rows = result %in% c("GOAL", "OWN GOAL")),
-      fn = function(x) paste(x, soccer_ball) # soccer_ball   soccer_ball_png
+      fn = function(x) paste(x, soccer_ball)
     ) %>% 
-    ## add plots
+    ## add plots into the empty 'ggplot' column
+    ## use `ggplot_image()` function and set height and aspect ratio
     text_transform(
       locations = cells_body(columns = vars(ggplot)),
       fn = function(x) {
-        map(match_shots_table_df$complete_plot, ggplot_image, height = px(150), aspect_ratio = 2) # 30 4
+        map(match_shots_table_df$complete_plot, ggplot_image, height = px(150), aspect_ratio = 2)
       }
     ) %>% 
     ## Rename cols
     cols_label(
       minute = "Minute", team_name = "Team", player_name = "Player", 
-      result = "Result", xG = "xG", rollsum = "Cumulative xG", ggplot = "Shot Map", situation = "Situation", 
+      result = "Result", xG = "xG", rollsum = "Cumulative xG", 
+      ggplot = "Shot Map", situation = "Situation", 
       type = "Shot Type", lastAction = "Assist Action", player_assisted = "Assist Player"
     ) %>% 
     cols_align("center") %>% 
@@ -338,5 +348,10 @@ gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_sho
 gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap.html")))
 ```
 
+# upload
+
+```{r}
+markdown::rpubsUpload(title = "gt-test.html", here::here("RMD/output/LivLee_match_gt_shotmap.html"))
+```
 
 
