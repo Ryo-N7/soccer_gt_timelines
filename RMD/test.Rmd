@@ -1,0 +1,37 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE}
+pacman::p_load(dplyr, gt)
+
+tab_1 <-
+  exibble %>%
+  dplyr::select(num, currency) %>%
+  gt(id = "one") %>%
+  tab_header(title = gt::html(glue::glue("this is a table title<img3 src='Leeds_United_FC.png'></img3>")),
+             subtitle = "subtitle subtitle subtitle x3") %>%
+  fmt_currency(
+    columns = vars(currency),
+    currency = "HKD"
+  ) %>%
+  fmt_scientific(
+    columns = vars(num)
+  ) %>%
+  opt_css(
+    css = '
+      #img3 {
+width: 350px; height: 350px;
+position: absolute;
+top: 0; left: 0;
+}
+      '
+  )
+
+tab_1
+```
+

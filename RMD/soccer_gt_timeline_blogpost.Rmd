@@ -13,6 +13,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
+matchday summary graphics
+
+
+
+2nd season so build MORE for more context 
+
+
+
+
 # Target Audience
 
 # Design Choices
@@ -32,10 +41,21 @@ Data source: understat.com
 ## Creating the soccer field plots
 
 
+
+
+
+
 ## Combining plots to data frame
 
 
+shot points could be color of team. rather keep consistently black as some colors might not work so well as solid points >>> use black as the stroke outline?
+
 ## Actual table
+
+
+
+
+Image files need to be placed in output folder
 
 ## Save online to RPubs
 
@@ -47,4 +67,10 @@ Data source: understat.com
 
 
 # Conclusion & Future Steps
+
+
+
+
+
+
 

@@ -193,13 +193,39 @@ createTimelineTableGT <- function(
   # soccer_ball_url <- here::here(glue::glue("Premier League 2020-2021/img/soccer_ball.png"))
   # soccer_ball_png <- gt::html(glue("<img src='{soccer_ball_url}'>"))   # width='500' height='600'
 
+  # <p><span style='font-size:40px'>Shots Timeline</span></p>
+  
   match_gt_xG_timeline <- 
     gt(match_shots_table_df) %>% 
-    tab_header(   # <p><span style='font-size:40px'>Shots Timeline</span></p>
-      title = gt::html(glue::glue("<p><img src='Liverpool_FC.png' alt='LFC' style='width:190px;vertical-align:middle;margin:50px 150px 50px 100px;'></span><img src='Leeds_United_FC.png' alt='LUFC' style='width:190px;vertical-align:middle;margin:50px 100px 50px 150px;'></p>")),
+    tab_header(   
+      title = gt::html(glue::glue("<span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_color}; font-size:55px'>{home_team}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_color}; font-size:55px'>{away_team}</b> <span style='font-size:35px'>({away_stats$xG} xG)"),
       #subtitle = gt::html(glue::glue("<span style='font-size:40px'>Premier League 2020-2021: Matchday 1 ({match_date})</span>"))
-      subtitle = gt::html(glue::glue("<span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_color}; font-size:55px'>{home_team}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_color}; font-size:55px'>{away_team}</b> <span style='font-size:35px'>({away_stats$xG} xG)<p><span style='font-size:40px'>Premier League 2020-2021: Matchday 1 ({match_date})</span></p>"))
+      subtitle = gt::html(glue::glue("<p><img src='Liverpool_FC.png' alt='LFC' style='width:190px;vertical-align:middle;margin:50px 150px 50px 100px;'><span style='font-size:40px'>Premier League 2020-2021: Matchday 1 ({match_date})</span><img src='Leeds_United_FC.png' alt='LUFC' style='width:190px;vertical-align:middle;margin:50px 100px 50px 150px;'></p>"))
+        )
     ) %>% 
+    ## add team logo images in corners via CSS
+#     opt_css(
+#       css = "
+#       #upper_left {
+# width: 125px; height: 125px;
+# position: absolute;
+# top: 0; left: 0;
+# background-image: url(images/upper-left.jpg);
+# background-repeat: no-repeat;
+# background-color: red;
+# }
+# 
+# #upper_right {
+# width: 125px; height: 125px;
+# position: absolute;
+# top: 0;
+# right: 0%;
+# background-image: url(images/upper-right.jpg);
+# background-repeat: no-repeat;
+# background-color: red;
+# }
+#       "
+#     ) %>% 
     ## title style
     tab_style(
       style = list(
@@ -215,18 +241,18 @@ createTimelineTableGT <- function(
       )
     ) %>% 
     ## subtitle style
-    # tab_style(
-    #   style = list(
-    #     cell_text(
-    #       font = "Roboto Condensed",
-    #       align = "center", # size = 35
-    #       color = "#000000"
-    #     )
-    #   ),
-    #   locations = list(
-    #     cells_title(groups = "subtitle")
-    #   )
-    # ) %>% 
+    tab_style(
+      style = list(
+        cell_text(
+          font = "Roboto Condensed",
+          align = "center", # size = 35
+          color = "#000000"
+        )
+      ),
+      locations = list(
+        cells_title(groups = "subtitle")
+      )
+    ) %>%
     ## column style
     tab_style(
       style = list(
@@ -241,14 +267,12 @@ createTimelineTableGT <- function(
     tab_style(
       style = cell_fill(color = home_color),
       locations = cells_body(
-        #columns = vars(team_name),
         rows = team_name == home_team)
     ) %>% 
     ## AWAY TEAM
     tab_style(
       style = cell_fill(color = away_color),
       locations = cells_body(
-        #columns = vars(team_name),
         rows = team_name == away_team)
     ) %>% 
     ## all cell text
@@ -328,8 +352,8 @@ gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_sho
 hom <- home_stats$TEAMS %>% str_sub(., 1, 3)
 awa <- away_stats$TEAMS %>% str_sub(., 1, 3)
 
-gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap.png")))
-gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap.html")))
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap2.png")))
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap2.html")))
 ```
 
 ```{r eval=FALSE, echo=FALSE}
