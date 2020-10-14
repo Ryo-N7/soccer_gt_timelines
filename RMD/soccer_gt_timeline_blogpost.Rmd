@@ -13,7 +13,35 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
-matchday summary graphics
+
+Despite recent advances that have overtaken xG
+
+measuring shot quality instead of simply looking at the lump sum of shots taken (off and on target) by one team compared to the other. 
+
+expected goals as a concept is still the most widely-accepted metric by the general public. 
+
+
+
+For R users who want to dabble I highly recommend the following:
+
+- 
+
+- 
+
+I started out in soccer analytics mainly to practice my data cleaning and visualization skills and over time it evolved into an entire portfolio of plots and graphs that you can see in []().
+
+At the beginning of last season I figured out how to grab match-level data from [understat.com]() via [Ewen Henderson]()'s [{understatr}]() package and set about creating a "matchday summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the general public. 
+
+Version 1 looked like this:
+
+![]()
+
+In the past few months after the Corona extended season ended I intended to make tweaks to the graph above but instead I just started creating other views with the data available while also incorporating some other stuff that I couldn't fit into the original match day viz. 
+
+![look-over-meme]()
+"Tweak and improve existing data viz." <> "Create new viz from scratch."
+
+One of the new viz I created was a chronological table of shots during the course of the match which provides the viewer with a lot more details about any single shot. Besides the xG value, things like the "situation" (open play? free kick? etc.), "shot type" (right, left, header), etc. were added for more context. 
 
 
 
@@ -26,29 +54,114 @@ matchday summary graphics
 
 # Design Choices
 
+
+The color-coding of the rows is intended to give you a clear idea of who were dominating shots at any given time period at a glance without even looking too closely at the details. Of course there may be a ton of shots in a small period of time or vice-versa which can skew your perception if you don't look at the "minute" column closely. 
+
+
+
 - sparkline timeline: no, cum xg covers that and can't see plot point easily in graph. also the nature of the chronological setup already means you get that aspect of the game anyways
 better to focus on something that's easier to see at first glance as highlights the main idea of the table >> shost. 
+
+bold text
+emphasize GOALS, OWN GOALS 
+add emoji to further highlight (regular version uses a star emoji instead due to HTML-to-PNG conversion issues)
+
+title text: different sizes >> focus on actual score line then down to xG 
+
+
+Concerns:
+
+large size of file
+
+inexperience with HTML/CSS to get team logos to slot in on either side of the title text.
+
+necessity to be careful about what colors to use as the main team colors (yellow for example is strictly off-limits)
+
 
 # Data
 
 Data source: understat.com
 
+Definitions for some variables are provided by hovering over column names on the website. Others are opaque but follow same terminology set by other data companies and websites. 
+
+Largest concern is over the accuracy of the xG model that understat uses to produce the xG values for shots. 
+
+Used by regular public and journalists but there's never been any info given to ______ 
+
+Most websites don't due to competitiveness of the analytics space 
+
+but that is the biggest caveat with using the data as I'm not in control over the specific outputs of these calculated statistics. 
+
+For the average Joe this along with the more recent FBref (advanced metrics provided by StatsBomb) are the best free and publically available websites for obtaining this type of data. 
+
+It would be a point of interest to create my own xG model based on the variables provided on understat.com by following some of the "how-to" blog posts around the web.
+
+
+## Shape of data
+
+Now let's go over what are the data frames you need to create these tables and plots. 
+
+
+1. shots_df = match_shots_data_clean
+
+
+
+
+2. rollsum_xG = match_rollsumxG
+
+
+
+
+
+3. home_stats & away_stats 
 
 
 
 # Code Breakdown
 
+
+## Other arguments
+
+
+- team_name 
+
+
+- team_color 
+
+
+- match_date
+
+
+
+
+
 ## Creating the soccer field plots
 
+- custom_pitch specification via {ggsoccer}
 
 
+- adjust coordinate data for vertical field view
 
+- function to define base shot map
+
+
+- function to define specific shot map
 
 
 ## Combining plots to data frame
 
 
+- 
+
+
+
 shot points could be color of team. rather keep consistently black as some colors might not work so well as solid points >>> use black as the stroke outline?
+
+
+
+
+
+
 
 ## Actual table
 
