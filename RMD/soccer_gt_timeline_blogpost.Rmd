@@ -1,15 +1,13 @@
 ---
-title: "Untitled"
-author: "RN7"
-date: "10/8/2020"
-output: html_document
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown_github
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
-
 
 # Introduction
 
@@ -137,15 +135,119 @@ Now let's go over what are the data frames you need to create these tables and p
 
 ## Creating the soccer field plots
 
+
+
 - custom_pitch specification via {ggsoccer}
+
+For the actual soccer field I use the {ggsoccer} package. Along with the pitch dimension specifications for data sources like Opta, WyScout, and StatsBomb, the package also allows you to specify your own dimensions to fit your own data. If you want a bit more of an in-depth code through using the {ggsoccer} package, take a look at the package [README](https://github.com/Torvaney/ggsoccer) or have a look at one of my [first blog posts](https://ryo-n7.github.io/2018-06-29-visualize-worldcup/) where I create my own World Cup 2018 data and visualize it with {ggsoccer}. 
+
+After playing around with the dimensions on understat the below are the measurements what I came up with and I defined it as a variable called `pitch_custom`. 
+
+```{r}
+pitch_custom <- list(
+  length = 587,
+  width = 373,
+  penalty_box_length = 101,
+  penalty_box_width = 211,
+  six_yard_box_length = 31,
+  six_yard_box_width = 111,
+  penalty_spot_distance = 66,
+  goal_width = 45,
+  origin_x = 0,
+  origin_y = 0)
+```
 
 
 - adjust coordinate data for vertical field view
 
+Since we are orienting the shot maps vertically we need to convert the coordinates from the horizontal view to vertical. We are only using one side of the pitch we don't need to have different adjustments for the "home" and "away" teams. The new coordinates will be defined to the variables "X" and "Y" capitalized, the lower-case coordinates will be kept in just as a reference and for checking positions. Then we `select()` only the variables we need then capitalize "Goal" and "Own Goal" labels for the table (you could also use `stringr::str_to_upper()` here). 
+
+```{r}
+## create coords
+match_df <- shots_df %>% 
+  ## switch coordinates for vertical view
+  mutate(
+    x = case_when(
+      h_a == "a" ~ X * 587,
+      h_a == "h" ~ X * 587,
+      TRUE ~ 0),
+    y = case_when(
+      h_a == "a" ~ Y * 373,
+      h_a == "h" ~ Y * 373,
+      TRUE ~ 0)) %>%
+  select(minute, player, team_name, 
+         result, x, X, y, Y, xG) %>% 
+  mutate(result = case_when(
+    result == "Goal" ~ "GOAL",
+    result == "Own Goal" ~ "OWN GOAL",
+    TRUE ~ result)) %>% 
+  mutate(result = forcats::as_factor(result)) %>% 
+  mutate(result = forcats::fct_relevel(result, "GOAL", "Saved Shot",
+                                       "On Post", "Blocked Shot", 
+                                       "Missed Shots", "OWN GOAL")) %>% 
+  arrange(desc(xG))
+```
+
 - function to define base shot map
+
+In this section we'll go over creating the two functions that create the shot maps. 
+
+```{r}
+create_shotmap_basic <- function(df = data, team_name = team_name) {
+  
+  shotxG_map_raw <- 
+    ggplot(df %>% filter(team_name == team_name), 
+           aes(x = x, y = y)) +
+    annotate_pitch(dimensions = pitch_custom) +
+    ## all shots in grey and transparent
+    geom_point(aes(x = x, y = y), color = "grey20", 
+               size = 3, alpha = 0.3) +
+    scale_x_continuous(expand = c(0.01, 0)) +
+    theme_pitch(aspect_ratio = 373/587) +
+    coord_flip(xlim = c(280, 590), # c(280, 590)
+               ylim = c(10, 365)) + # c(-1, 373)
+    theme(plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "pt"),
+          text = element_markdown(family = "Roboto Condensed"),
+          legend.position = "none")    
+  
+  return(shotxG_map_raw)
+}
+```
+
 
 
 - function to define specific shot map
+
+
+```{r}
+add_xG_shot <- function(x, y, xG, plot) {
+  fill_cols <- c("Goal" = "#1a9641",
+                 "Saved Shot" = "orange",
+                 "Blocked Shot" = "grey",
+                 "Missed Shot" = "black",
+                 "Own Goal" = "#d7191c",
+                 "On Post" = "#004CFF")
+  
+  shotxG_map_point <- 
+    plot +
+    # specific shot point in black and bold
+    geom_point(x = x, y = y, color = "black", 
+               size = 12) +
+    scale_x_continuous(expand = c(0.01, 0)) +
+    scale_color_manual(values = fill_cols, guide = NA) +
+    ## label for shot point
+    geom_label(x = 318, y = 186.5, 
+               color = "black", size = 20,
+               fill = "white", family = "Roboto Slab",
+               label = glue::glue("{xG} xG"))
+  
+  return(shotxG_map_point)
+}
+```
+
+
+
+
 
 
 ## Combining plots to data frame
