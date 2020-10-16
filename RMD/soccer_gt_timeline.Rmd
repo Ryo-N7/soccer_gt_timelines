@@ -94,8 +94,7 @@ createTimelineTableGT <- function(
     mutate(result = forcats::as_factor(result)) %>% 
     mutate(result = forcats::fct_relevel(result, "GOAL", "Saved Shot",
                                          "On Post", "Blocked Shot", 
-                                         "Missed Shots", "OWN GOAL")) %>% 
-    arrange(desc(xG))
+                                         "Missed Shots", "OWN GOAL"))
   
   create_shotmap_basic <- function(df = data, team_name = team_name) {
     
