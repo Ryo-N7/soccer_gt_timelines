@@ -99,13 +99,31 @@ It would be a point of interest to create my own xG model based on the variables
 
 Now let's go over what are the data frames you need to create these tables and plots. 
 
+```{r}
+shots_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_shots_data_clean.RDS")))
+
+roll_sum_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_rollsumxG.RDS")))
+
+home_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_home_stats.RDS")))
+
+away_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_away_stats.RDS")))
+
+team_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_team_stats.RDS")))
+
+home_team = "Liverpool"
+away_team = "Leeds"
+home_color = "#d00027" 
+away_color = "#1D428A"
+match_date <- "Sep. 12, 2020"
+```
+
 
 1. shots_df = match_shots_data_clean
 
 
 
 
-2. rollsum_xG = match_rollsumxG
+2. rollsum_df = match_rollsumxG
 
 
 
@@ -117,27 +135,23 @@ Now let's go over what are the data frames you need to create these tables and p
 
 # Code Breakdown
 
+## Packages
 
-## Other arguments
+THe packages we'll be using are some of the usual tidyverse stalwarts such as {dplyr}, {tidyr}, {ggplot2}, {forcats}, etc. For soccer-specific packages we have the {understatr} package for downloading the data (not shown in this blog post) and the {ggsoccer} package for creating soccer fields in {ggplot2}. Last but certainly not least are {grid} and {gridExtra} which are used for advanced plot assembly. We also use the {extrafont} package to make use of some cool fonts for the table/plots, they're loaded in via the `loadfonts()` call. 
 
-
-- team_name 
-
-
-- team_color 
-
-
-- match_date
-
-
-
+```{r}
+# Packages
+pacman::p_load(dplyr, tidyr, stringr, stringi, purrr,
+               tibble, lubridate, glue, rlang, 
+               ggplot2, grid, gridExtra, 
+               gt, forcats, ggtext, extrafont, ggrepel, 
+               understatr, ggsoccer)
+## Load fonts
+loadfonts(quiet = TRUE)
+```
 
 
 ## Creating the soccer field plots
-
-
-
-- custom_pitch specification via {ggsoccer}
 
 For the actual soccer field I use the {ggsoccer} package. Along with the pitch dimension specifications for data sources like Opta, WyScout, and StatsBomb, the package also allows you to specify your own dimensions to fit your own data. If you want a bit more of an in-depth code through using the {ggsoccer} package, take a look at the package [README](https://github.com/Torvaney/ggsoccer) or have a look at one of my [first blog posts](https://ryo-n7.github.io/2018-06-29-visualize-worldcup/) where I create my own World Cup 2018 data and visualize it with {ggsoccer}. 
 
@@ -157,9 +171,6 @@ pitch_custom <- list(
   origin_y = 0)
 ```
 
-
-- adjust coordinate data for vertical field view
-
 Since we are orienting the shot maps vertically we need to convert the coordinates from the horizontal view to vertical. We are only using one side of the pitch we don't need to have different adjustments for the "home" and "away" teams. The new coordinates will be defined to the variables "X" and "Y" capitalized, the lower-case coordinates will be kept in just as a reference and for checking positions. Then we `select()` only the variables we need then capitalize "Goal" and "Own Goal" labels for the table (you could also use `stringr::str_to_upper()` here). 
 
 ```{r}
@@ -175,8 +186,8 @@ match_df <- shots_df %>%
       h_a == "a" ~ Y * 373,
       h_a == "h" ~ Y * 373,
       TRUE ~ 0)) %>%
-  select(minute, player, team_name, 
-         result, x, X, y, Y, xG) %>% 
+  # select(minute, player, team_name, 
+  #        result, x, X, y, Y, xG) %>% 
   mutate(result = case_when(
     result == "Goal" ~ "GOAL",
     result == "Own Goal" ~ "OWN GOAL",
@@ -184,7 +195,8 @@ match_df <- shots_df %>%
   mutate(result = forcats::as_factor(result)) %>% 
   mutate(result = forcats::fct_relevel(result, "GOAL", "Saved Shot",
                                        "On Post", "Blocked Shot", 
-                                       "Missed Shots", "OWN GOAL"))
+                                       "Missed Shots", "OWN GOAL")) %>% 
+  mutate(id = row_number())
 ```
 
 This is how the data looks like now. There's a row for every shot in chronological order along with the coordinates for the shots.
@@ -197,7 +209,7 @@ Using this data frame we can create shot map plots that will serve as the base f
 
 - function to define base shot map
 
-This function will take the `data` and `team_name` inputs that come from the `match_df` data frame that we just created. This plot will plot **all** shots per team for every row of the data frame. After using `filter()` to only get the shots for the specific team, `annotate_pitch()` is used to create the pitch object using the dimensions we specified in `pitch_custom` earlier. The `theme_pitch()` is a helper function for {ggsoccer} that removes all the background and axes details while `coord_flip()` is used to flip the field so that the goal is at the top of the plot. All the shots will be grey and transparent (via the 'alpha' argument) as later on we will highlight the actual shot for a specific row in our table in a different plotting function. 
+This function will take the `data` and `team_name` inputs that come from the `match_df` data frame that we just created. This plot will plot **all** shots per team for every row of the data frame. After using `filter()` to only get the shots for the specific team, `annotate_pitch()` is used to create the pitch object using the dimensions we specified in `pitch_custom` earlier. The `theme_pitch()` is a helper function for {ggsoccer} that removes all the background and axes details while `coord_flip()` is used to flip the field so that the goal is at the top of the plot. All the shots will be gray and transparent (via the 'alpha' argument) as later on we will highlight the actual shot for a specific row in our table in a different plotting function. 
 
 ```{r}
 create_shotmap_basic <- function(df = data, team_name = team_name) {
@@ -211,8 +223,8 @@ create_shotmap_basic <- function(df = data, team_name = team_name) {
                size = 3, alpha = 0.3) +
     scale_x_continuous(expand = c(0.01, 0)) +
     theme_pitch(aspect_ratio = 373/587) +
-    coord_flip(xlim = c(280, 590), # c(280, 590)
-               ylim = c(10, 365)) + # c(-1, 373)
+    coord_flip(xlim = c(280, 590), 
+               ylim = c(10, 365)) +
     theme(plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "pt"),
           text = element_markdown(family = "Roboto Condensed"),
           legend.position = "none")    
@@ -222,10 +234,9 @@ create_shotmap_basic <- function(df = data, team_name = team_name) {
 ```
 
 
-
 Using the above function now we need to 
 
-We `nest()` the data by "team_name" so that when we plot our basic shot maps each row will plot all the shots for the specified team in "team_name". By "nesting" the data this way we can apply the plotting function to **all** the data for **each** team. This way we won't be plotting a basic shot map using shot data from both teams. 
+We `nest()` the data by "team_name" so that when we plot our basic shot maps each row will plot all the shots for each team in "team_name". By "nesting" the data this way we can apply the plotting function to **all** the data for a specific team team. This way we won't be plotting a basic shot map using shot data from both teams. 
 
 ```{r}
 match_df %>% tibble::as_tibble() %>% group_by(team_name) %>% nest()
@@ -239,9 +250,8 @@ match_df %>%
   group_by(team_name) %>% 
   nest() %>% 
   head(1) %>% 
-  unnest()
+  unnest(cols = c(data))
 ```
-
 
 With this data structure in hand, we apply the basic shot map plot function to every row of data inside the "data" column for both teams. We can do this by passing the "data" and "team_name" columns as the arguments to the shot map function which then iterates over every row in each team's "data" column. 
 
@@ -252,43 +262,26 @@ match_df_basic_plot <- match_df %>%
   ## nest by team
   group_by(team_name) %>% 
   nest() %>% 
-  ## add all shots per team for each row
+  ## apply plots for all shots per team, for each row in their respective "data" column
   mutate(plot = map2(data, team_name, create_shotmap_basic))
 ```
 
-When we take a `glimpse()` at our data frame we now see an additional column, "plot" that houses plots for each row of shots for both teams. 
-So Liverpool took 22 total shots and therefore have 22 rows inside "data" which results in 22 plots while for Leeds there are 6, 6, and 6 of the same. 
+When we take a `glimpse()` at our data frame we now see an additional column, "plot" that houses plots for each row of shots for both teams. So Liverpool took 22 total shots and therefore have 22 rows inside "data" which results in 22 plots while for Leeds there are 6, 6, and 6 of the same. Both "data" and "plot" are now what are called "list-columns".
 
 ```{r}
 glimpse(match_df_basic_plot)
 ```
 
-
-
-
-
 ```{r}
-  ## clean cumsum df
-  match_rollsum_simple <- roll_sum_df %>% 
-    ## take out blank rows with xG = 0
-    filter(xG != 0.00) %>% 
-    select(minute_2 = minute, firstname, team_name, xG, minute_goal, rollsum_goal,
-           situation, shotType, player_assisted, lastAction)
-  
-  ## join together cumsum df with plot df
-  ## this is so after 'basic plot' is turned into a nested df
-  ## the columns that were "lost" inside the nesting are added back in
-  dfdf <- match_df %>% 
-    left_join(match_df_basic_plot) %>% 
-    left_join(match_rollsum_simple, 
-              by = c("xG", "team_name", "minute" = "minute_2")) %>% 
-    ## make sure its in chrnological order
-    arrange(minute)
+match_df_basic_plot <- match_df_basic_plot %>% 
+  unnest(cols = "data") %>% 
+  arrange(id)
+
+glimpse(match_df_basic_plot)
 ```
 
 
-
-
+So now we have a data frame with a basic shot map for each team for each row of shots. However, all of the 
 
 
 - function to define specific shot map
@@ -327,19 +320,53 @@ add_xG_shot <- function(x, y, xG, plot) {
 ## Combining plots to data frame
 
 
-- 
-
-
+```{r}
+## map plot to df again with a shot point for each row/plot
+dfdfdf <- match_df_basic_plot %>% 
+  ## shot-per-row, using 'plot' as base pass along the 'x', 'y' coordinates and xG value
+  ## to "add_xG_shot()` function for each row. 
+  ## have empty 'ggplot' column for gt plot-insertion purposes
+  mutate(complete_plot = pmap(list(x, y, xG, plot), add_xG_shot),
+         ggplot = NA) %>% 
+  select(-plot) %>% 
+  left_join(match_rollsum_simple %>% select(id, rollsum_goal), by = "id")
+```
 
 shot points could be color of team. rather keep consistently black as some colors might not work so well as solid points >>> use black as the stroke outline?
 
 
 
+## Tidying up to prep for table creation
+
+```{r}
+## data creation for actual table
+match_shots_table_df <- dfdfdf %>% 
+  select(minute, team_name, result, xG, firstname, player, 
+         ggplot, complete_plot, rollsum = rollsum_goal,
+         situation, type = shotType, player_assisted, lastAction) %>% 
+  ## player name labels, clean "lastAction"
+  mutate(player_name = paste(firstname, player),
+         lastAction = if_else(lastAction == "None", NA_character_, lastAction)) %>% 
+  ## NAs as blanks
+  mutate(across(where(is.character), ~ replace_na(., ""))) %>% 
+  ## take out extraneous name vars and move to after team name
+  select(-firstname, -player) %>% 
+  relocate(player_name, .after = team_name) 
+
+glimpse(match_shots_table_df)
+```
 
 
 
 
 ## Actual table
+
+
+
+```{r}
+soccer_ball <- "<span style='color:white;font-size:25px'>&#9917;</span>"
+```
+
 
 
 
