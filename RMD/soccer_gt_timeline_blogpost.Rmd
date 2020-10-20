@@ -263,7 +263,8 @@ match_df_basic_plot <- match_df %>%
   group_by(team_name) %>% 
   nest() %>% 
   ## apply plots for all shots per team, for each row in their respective "data" column
-  mutate(plot = map2(data, team_name, create_shotmap_basic))
+  mutate(plot = map2(data, team_name, create_shotmap_basic)) %>% 
+  ungroup()
 ```
 
 When we take a `glimpse()` at our data frame we now see an additional column, "plot" that houses plots for each row of shots for both teams. So Liverpool took 22 total shots and therefore have 22 rows inside "data" which results in 22 plots while for Leeds there are 6, 6, and 6 of the same. Both "data" and "plot" are now what are called "list-columns".
@@ -271,6 +272,13 @@ When we take a `glimpse()` at our data frame we now see an additional column, "p
 ```{r}
 glimpse(match_df_basic_plot)
 ```
+
+
+
+So now we have a data frame with a basic shot map for each team for each row of shots. However, all of the 
+
+
+we can get those back by `unnest()`-ing the "data" column so all the other shot information is unpacked 
 
 ```{r}
 match_df_basic_plot <- match_df_basic_plot %>% 
@@ -280,8 +288,6 @@ match_df_basic_plot <- match_df_basic_plot %>%
 glimpse(match_df_basic_plot)
 ```
 
-
-So now we have a data frame with a basic shot map for each team for each row of shots. However, all of the 
 
 
 - function to define specific shot map
@@ -332,11 +338,30 @@ dfdfdf <- match_df_basic_plot %>%
   left_join(match_rollsum_simple %>% select(id, rollsum_goal), by = "id")
 ```
 
+
+```{r}
+dfdfdf$complete_plot[[1]]
+```
+
+Now for a plot for a row where the team is Leeds United. You can see that the plot is different from the Liverpool one as the "grey"-ed out shots are Leeds' other shots. This is because of what we did earlier in creating the "basic" shot map for each team separately.
+
+```{r}
+dfdfdf$complete_plot[[4]]
+```
+
+
+```{r}
+glimpse(dfdfdf)
+```
+
+
 shot points could be color of team. rather keep consistently black as some colors might not work so well as solid points >>> use black as the stroke outline?
 
 
 
 ## Tidying up to prep for table creation
+
+As seen in our last `glimpse()` call we have a lot of columns that we won't really need for the table so we'll do some final cleaning up before we get to the {gt} table code. 
 
 ```{r}
 ## data creation for actual table
@@ -372,6 +397,11 @@ soccer_ball <- "<span style='color:white;font-size:25px'>&#9917;</span>"
 
 
 Image files need to be placed in output folder
+
+![Picture of directory organization]()
+
+
+
 
 ## Save online to RPubs
 
