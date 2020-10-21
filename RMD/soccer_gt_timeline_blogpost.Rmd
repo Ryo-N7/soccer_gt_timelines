@@ -46,6 +46,15 @@ One of the new viz I created was a chronological table of shots during the cours
 2nd season so build MORE for more context 
 
 
+So here are the new xG summary timelines: 
+
+![LiverpoolLeeds]()
+
+
+
+![]()
+
+
 
 
 # Target Audience
@@ -186,8 +195,6 @@ match_df <- shots_df %>%
       h_a == "a" ~ Y * 373,
       h_a == "h" ~ Y * 373,
       TRUE ~ 0)) %>%
-  # select(minute, player, team_name, 
-  #        result, x, X, y, Y, xG) %>% 
   mutate(result = case_when(
     result == "Goal" ~ "GOAL",
     result == "Own Goal" ~ "OWN GOAL",
@@ -207,7 +214,7 @@ glimpse(match_df)
 
 Using this data frame we can create shot map plots that will serve as the base for a more detailed plot in a later section.
 
-- function to define base shot map
+### Function to define base shot map
 
 This function will take the `data` and `team_name` inputs that come from the `match_df` data frame that we just created. This plot will plot **all** shots per team for every row of the data frame. After using `filter()` to only get the shots for the specific team, `annotate_pitch()` is used to create the pitch object using the dimensions we specified in `pitch_custom` earlier. The `theme_pitch()` is a helper function for {ggsoccer} that removes all the background and axes details while `coord_flip()` is used to flip the field so that the goal is at the top of the plot. All the shots will be gray and transparent (via the 'alpha' argument) as later on we will highlight the actual shot for a specific row in our table in a different plotting function. 
 
@@ -273,12 +280,7 @@ When we take a `glimpse()` at our data frame we now see an additional column, "p
 glimpse(match_df_basic_plot)
 ```
 
-
-
-So now we have a data frame with a basic shot map for each team for each row of shots. However, all of the 
-
-
-we can get those back by `unnest()`-ing the "data" column so all the other shot information is unpacked 
+So now we have a data frame with a basic shot map for each team for each row of shots. However, all of the detailed info we need for our table is hidden inside the "data" column. We can get those back by `unnest()`-ing the "data" column so all the other shot information is unpacked. 
 
 ```{r}
 match_df_basic_plot <- match_df_basic_plot %>% 
@@ -288,29 +290,18 @@ match_df_basic_plot <- match_df_basic_plot %>%
 glimpse(match_df_basic_plot)
 ```
 
+### Function to define specific shot map
 
-
-- function to define specific shot map
-
-This second plotting function takes the plots we will create with the previous function and adds in the specific shot for each row to the base plot. The "plot" that is being passed into this function are all the plots saved in a "plot" column of the data frame. 
-
+This second plotting function takes the plots we created with the previous base shot map function and adds in the specific shot for each row to the base plot. The "plot" that is being passed into this function are all the plots we had saved in the "plot" column of the data frame. We add in a new `geom_point()` for the specific shot recorded in a row and make it bigger in size and in black to make it stand out from the rest of the shots the team took. At the bottom we add in a label for the xG value.  
 
 ```{r}
 add_xG_shot <- function(x, y, xG, plot) {
-  fill_cols <- c("Goal" = "#1a9641",
-                 "Saved Shot" = "orange",
-                 "Blocked Shot" = "grey",
-                 "Missed Shot" = "black",
-                 "Own Goal" = "#d7191c",
-                 "On Post" = "#004CFF")
-  
   shotxG_map_point <- 
     plot +
     # specific shot point in black and bold
     geom_point(x = x, y = y, color = "black", 
                size = 12) +
     scale_x_continuous(expand = c(0.01, 0)) +
-    scale_color_manual(values = fill_cols, guide = NA) +
     ## label for shot point
     geom_label(x = 318, y = 186.5, 
                color = "black", size = 20,
@@ -321,10 +312,15 @@ add_xG_shot <- function(x, y, xG, plot) {
 }
 ```
 
-
-
 ## Combining plots to data frame
 
+Before we create the new plots, we finally work with the data frame that has the rolling xG sums. The IDs should match up with the IDs in `match_df_basic_plot` because the `roll_sum_df` data frame is just an expanded version of `match_df_basic_plot` that created empty rows for every minute. Once you `filter()` out those rows without an xG value the rows for both should match up. Be very careful when manipulating both of these data frames in previous steps as it can become very easy for the IDs to get messed up especially when there are multiple chances by either team in the same minute. Make sure the row order of the shots data frame is exactly as downloaded from `understat.com` before applying the IDs to the rows.
+
+```{r}
+match_rollsum_simple <- roll_sum_df %>% filter(xG != 0.00) %>% mutate(id = row_number()) %>% select(id, rollsum_goal)
+```
+
+Since we have more than two arguments that we are passing to the `add_xG_shot()` function we need to iterate over every row using the `pmap()` function instead of `map2()`.
 
 ```{r}
 ## map plot to df again with a shot point for each row/plot
@@ -335,9 +331,10 @@ dfdfdf <- match_df_basic_plot %>%
   mutate(complete_plot = pmap(list(x, y, xG, plot), add_xG_shot),
          ggplot = NA) %>% 
   select(-plot) %>% 
-  left_join(match_rollsum_simple %>% select(id, rollsum_goal), by = "id")
+  left_join(match_rollsum_simple, by = "id")
 ```
 
+We can check the data frame for the plot in the first row, which is the first shot in the game from Mo Salah in the 7th minute.
 
 ```{r}
 dfdfdf$complete_plot[[1]]
@@ -349,19 +346,17 @@ Now for a plot for a row where the team is Leeds United. You can see that the pl
 dfdfdf$complete_plot[[4]]
 ```
 
+shot points could be color of team. rather keep consistently black as some colors might not work so well as solid points >>> use black as the stroke outline?
+
+## Tidying up to prep for table creation
+
+We are now very close to the data frame we need to start making the table.
 
 ```{r}
 glimpse(dfdfdf)
 ```
 
-
-shot points could be color of team. rather keep consistently black as some colors might not work so well as solid points >>> use black as the stroke outline?
-
-
-
-## Tidying up to prep for table creation
-
-As seen in our last `glimpse()` call we have a lot of columns that we won't really need for the table so we'll do some final cleaning up before we get to the {gt} table code. 
+There are a lot of columns that we won't really need for the table so we'll do some final cleaning up before we get to the {gt} table code. We `select()` for the columns that hold the info that we really need and then make edits to `lastAction` column to clean them up a bit. We replace any `NA`s with a blank so they don't show up in the table as `NA` text. A new `player_name` column is created by concatenating the `firstname` and `player` (which contains the player's last name) columns into one. Finally we use the new `relocate()` function to place the newly created `player_name` column to be placed after the `team_name` column. 
 
 ```{r}
 ## data creation for actual table
@@ -381,16 +376,27 @@ match_shots_table_df <- dfdfdf %>%
 glimpse(match_shots_table_df)
 ```
 
+## The table
 
-
-
-## Actual table
-
-
+To give rows where the shots are goals a bit of 'oomph' in the table, we will add a soccer ball emoji next to the all-caps "GOAL" text. We can add in the unicode version of the emoji as an object that we'll then `paste()` into the text. From my attempts it only works well for the `.HTML` output and for the `.PNG` output I use for my regular match summary graphics I have to use a "star" emoji instead as the soccer ball one doesn't render too well in `.PNG`.
 
 ```{r}
 soccer_ball <- "<span style='color:white;font-size:25px'>&#9917;</span>"
 ```
+
+
+
+
+
+```{r}
+gt(match_shots_table_df) %>% 
+  tab_header(   
+    title = gt::html(glue::glue("<p><img src='Liverpool_FC.png' alt='LFC' style='width:190px;vertical-align:middle;margin:50px 50px 50px 150px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_color}; font-size:55px'>{home_team}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_color}; font-size:55px'>{away_team}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='Leeds_United_FC.png' alt='LUFC' style='width:190px;vertical-align:middle;margin:50px 150px 50px 50px;'></p> <p><span style='font-size:40px'>Premier League 2020-2021: Matchday 1 ({match_date})</span></p>")
+    )
+  )
+```
+
+
 
 
 
