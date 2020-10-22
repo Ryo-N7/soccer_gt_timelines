@@ -84,6 +84,8 @@ inexperience with HTML/CSS to get team logos to slot in on either side of the ti
 
 necessity to be careful about what colors to use as the main team colors (yellow for example is strictly off-limits)
 
+hard to scroll, no freeze panels >>> but made sure to order the columns in a way that it's immediately obvious what column is what regardless of how far down you are in the table.
+
 
 # Data
 
@@ -228,7 +230,7 @@ create_shotmap_basic <- function(df = data, team_name = team_name) {
     ## all shots in grey and transparent
     geom_point(aes(x = x, y = y), color = "grey20", 
                size = 3, alpha = 0.3) +
-    scale_x_continuous(expand = c(0.01, 0)) +
+    #scale_x_continuous(expand = c(0.01, 0)) +
     theme_pitch(aspect_ratio = 373/587) +
     coord_flip(xlim = c(280, 590), 
                ylim = c(10, 365)) +
@@ -301,7 +303,7 @@ add_xG_shot <- function(x, y, xG, plot) {
     # specific shot point in black and bold
     geom_point(x = x, y = y, color = "black", 
                size = 12) +
-    scale_x_continuous(expand = c(0.01, 0)) +
+    #scale_x_continuous(expand = c(0.01, 0)) +
     ## label for shot point
     geom_label(x = 318, y = 186.5, 
                color = "black", size = 20,
@@ -317,7 +319,10 @@ add_xG_shot <- function(x, y, xG, plot) {
 Before we create the new plots, we finally work with the data frame that has the rolling xG sums. The IDs should match up with the IDs in `match_df_basic_plot` because the `roll_sum_df` data frame is just an expanded version of `match_df_basic_plot` that created empty rows for every minute. Once you `filter()` out those rows without an xG value the rows for both should match up. Be very careful when manipulating both of these data frames in previous steps as it can become very easy for the IDs to get messed up especially when there are multiple chances by either team in the same minute. Make sure the row order of the shots data frame is exactly as downloaded from `understat.com` before applying the IDs to the rows.
 
 ```{r}
-match_rollsum_simple <- roll_sum_df %>% filter(xG != 0.00) %>% mutate(id = row_number()) %>% select(id, rollsum_goal)
+match_rollsum_simple <- roll_sum_df %>% 
+  filter(xG != 0.00) %>% 
+  mutate(id = row_number()) %>% 
+  select(id, rollsum_goal)
 ```
 
 Since we have more than two arguments that we are passing to the `add_xG_shot()` function we need to iterate over every row using the `pmap()` function instead of `map2()`.
@@ -384,17 +389,149 @@ To give rows where the shots are goals a bit of 'oomph' in the table, we will ad
 soccer_ball <- "<span style='color:white;font-size:25px'>&#9917;</span>"
 ```
 
-
-
-
+To start off, we add in the title and team logo images via (extremely bad) HTML code. This is the part I'm least happy with as ideally there wouldn't be a big gap between the score line and the subtitle text while still having the team logo images set on either side of the entire text block. In reality you'd use CSS to have the team logos be independent of the HTML code that does all the styling on the title text but I'm not knowledgeable enough at it at this point. The way I've done it below is the best way I could do it without making it worse. 
 
 ```{r}
-gt(match_shots_table_df) %>% 
+match_gt_xG_timeline <- 
+  gt(match_shots_table_df) %>% 
   tab_header(   
     title = gt::html(glue::glue("<p><img src='Liverpool_FC.png' alt='LFC' style='width:190px;vertical-align:middle;margin:50px 50px 50px 150px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_color}; font-size:55px'>{home_team}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_color}; font-size:55px'>{away_team}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='Leeds_United_FC.png' alt='LUFC' style='width:190px;vertical-align:middle;margin:50px 150px 50px 50px;'></p> <p><span style='font-size:40px'>Premier League 2020-2021: Matchday 1 ({match_date})</span></p>")
     )
   )
 ```
+
+Styling the individual cells of our {gt} table can be done via the `tab_style()` function. Throughout the titles and headers we use the font `Roboto Slab` which is a thicker version of the `Roboto Condensed` font that I use for nearly all of my visualizations. 
+
+First, we add some styling to the title text that we just created above. We can specify that the cells we want to style via the `locations` argument and setting that to "title" via the `cells_title()` function. For the actual styling via the `style` argument, we can specify font, weight, color, etc. via the `cell_text()` function. 
+
+For styling the column headers we specify the `location` with the `cells_column_labels()` function. The special `everything()` helper function (from the {tidyselect} package) is used as we want to specify the style for all column headers. We want the text in the column headers to stand out so we make them extra big by specifying the size to be `xx-large` and weight `bold`. 
+
+We also want to add some small vertical borders to the column headers so they are divided up, styles for borders can be specified via the `cells_borders()` function. 
+
+```{r}
+match_gt_xG_timeline <- 
+  match_gt_xG_timeline %>% 
+  ## title style
+  tab_style(
+    style = list(
+      cell_text(
+        font = "Roboto Slab",
+        align = "center",
+        weight = "bold",
+        color = "#000000"
+      )
+    ),
+    locations = list(
+      cells_title(groups = "title")
+    )
+  ) %>% 
+  ## column style
+  tab_style(
+    style = list(
+      cell_text(font = "Roboto Slab", align = "center", 
+                size = "xx-large", weight = "bold"),
+      cell_borders(sides = c("left", "right"), 
+                   color = "grey20", weight = px(2))
+    ),
+    locations = list(
+      cells_column_labels(everything())
+    )
+  ) 
+```
+
+To style the rows for either team we have to do a bit more in the `locations` argument of `tab_style()`. Using `filter()`-style syntax we specify the rows so that the `team_name` column matches the value of either the `home_team` (Liverpool) or `away_team` (Leeds United). For rows where Liverpool took a shot we fill the cells with `home_color` "red" and for Leeds `away_color` or "blue". We specified the `home_color` and `away_color` variables at the beginning of the tutorial. When all of this code is turned into a function, you would have these variables set as arguments to the table-making function so you can easily specify any color hex code as needed. 
+
+```{r}
+match_gt_xG_timeline <- 
+  match_gt_xG_timeline %>% 
+  ## HOME TEAM
+  tab_style(
+    style = cell_fill(color = home_color),
+    locations = cells_body(
+      rows = team_name == home_team)
+  ) %>% 
+  ## AWAY TEAM
+  tab_style(
+    style = cell_fill(color = away_color),
+    locations = cells_body(
+      rows = team_name == away_team)
+  ) %>% 
+  ## all cell text
+  tab_style(
+    style = cell_text(color = "white", align = "center", size = "x-large",
+                      font = "Roboto Condensed", weight = "bold"),
+    locations = cells_body(
+      columns = TRUE) 
+  ) 
+```
+
+In this section of the {gt} code we go over the `text_transform()` function for doing two very different operations,  for appending the soccer ball emoji unicode to the "GOAL" or "OWN GOAL" cells and for adding the shot maps we created earlier into the table.
+
+
+
+
+
+
+
+```{r}
+match_gt_xG_timeline <- 
+  match_gt_xG_timeline %>% 
+  ## add Goal result emoji by pasting in the emoji next to the 'result' text
+  text_transform(
+    locations = cells_body(
+      columns = vars(result),
+      rows = result %in% c("GOAL", "OWN GOAL")),
+    fn = function(x) paste(x, soccer_ball)
+  ) %>% 
+  ## add plots into the empty 'ggplot' column
+  ## use `ggplot_image()` function and set height and aspect ratio
+  text_transform(
+    locations = cells_body(columns = vars(ggplot)),
+    fn = function(x) {
+      map(match_shots_table_df$complete_plot, ggplot_image, height = px(150), aspect_ratio = 2)
+    }
+  )
+```
+
+Using the `cols_label()` function we can easily re-name all of the column headers to a more table-friendly name. The `cols_align()` is used to align the text of columns. 
+
+```{r}
+match_gt_xG_timeline <- 
+  match_gt_xG_timeline %>% 
+  ## Rename cols
+  cols_label(
+    minute = "Minute", team_name = "Team", player_name = "Player", 
+    result = "Result", xG = "xG", rollsum = "Cumulative xG", 
+    ggplot = "Shot Map", situation = "Situation", 
+    type = "Shot Type", lastAction = "Assist Action", player_assisted = "Assist Player"
+  ) %>% 
+  cols_align("center")
+```
+
+The `tab_options()` function is a very general function that gives you a lot of options for styles similar to `tab_style()` except without having to bother with specifying the location and such. For our purposes I'm using this to add a thick grey border at the top and bottom of the column headers. This can be done ia `tab_style()` like we did for the "left" and "right" vertical borders but I didn't want to bother with the whole `tab_style()` syntax all over again. You could just add another `tab_style()` function and just specify the "sides" in `cells_borders()` to "top" and "bottom" if you want to do it that way. We make the top and bottom borders of the column labels a bit thicker to separate them from the title and the body of the table by setting the width to be `px(5)` (px stands for pixel).
+
+The "data_row.padding" argument sets the amount of vertical padding to each row of the table while "source_notes.font.size" is fairly self-explanatory. We set the actual text for the source note via the `tab_source_note()` function. Instead of using HTML to style the text, we can use markdown via the `md()` function and style the text using regular markdown syntax. 
+
+Finally we use the `cols_hide()` function to hide the columns that we don't want to show. 
+
+```{r}
+match_gt_xG_timeline <- 
+  match_gt_xG_timeline %>% 
+  ## general table options
+  tab_options(
+    column_labels.border.top.color = "grey",
+    column_labels.border.top.width= px(5),
+    column_labels.border.bottom.color = "grey",
+    column_labels.border.bottom.width= px(5),
+    data_row.padding = px(15),
+    source_notes.font.size = 20
+  ) %>% 
+  tab_source_note(source_note = md("**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat")) %>% 
+  cols_hide(vars(complete_plot, xG))
+```
+
+
+
 
 
 
