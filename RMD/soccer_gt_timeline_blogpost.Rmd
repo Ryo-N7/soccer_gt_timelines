@@ -134,14 +134,32 @@ match_date <- "Sep. 12, 2020"
 
 
 
+```{r}
+glimpse(shots_df)
+```
+
+
+
 2. rollsum_df = match_rollsumxG
 
+Has the rolling sum of xG values for the match over every shot taken in the match.
 
+Taking the shots_df data frame above, expanding it out for every minute of the game and the applying the 
 
+cumsum() and lag() functions. Be very careful and make sure that the rows are ordered properly before running this function.
+
+```{r}
+glimpse(roll_sum_df)
+```
 
 
 3. home_stats & away_stats 
 
+The box score you see in the "" tab of the match page on understat.com.
+
+```{r}
+glimpse(team_stats)
+```
 
 
 # Code Breakdown
@@ -182,7 +200,7 @@ pitch_custom <- list(
   origin_y = 0)
 ```
 
-Since we are orienting the shot maps vertically we need to convert the coordinates from the horizontal view to vertical. We are only using one side of the pitch we don't need to have different adjustments for the "home" and "away" teams. The new coordinates will be defined to the variables "X" and "Y" capitalized, the lower-case coordinates will be kept in just as a reference and for checking positions. Then we `select()` only the variables we need then capitalize "Goal" and "Own Goal" labels for the table (you could also use `stringr::str_to_upper()` here). 
+Since we are orienting the shot maps vertically we need to convert the coordinates from the horizontal view to vertical. We are only using one side of the pitch we don't need to have different adjustments for the "home" and "away" teams. The new coordinates will be defined to the variables "X" and "Y" capitalized, the lower-case coordinates will be kept in just as a reference and for checking positions. Then we `select()` only the variables we need then capitalize "Goal" and "Own Goal" labels for the table (you could also use `stringr::str_to_upper()` here). Also note that you can include most if not **all** of these `mutate()` calls into **one** `mutate()` call but I like to keep them separated so I can comment out blocks of code easier. 
 
 ```{r}
 ## create coords
@@ -197,6 +215,7 @@ match_df <- shots_df %>%
       h_a == "a" ~ Y * 373,
       h_a == "h" ~ Y * 373,
       TRUE ~ 0)) %>%
+  ## edit result values
   mutate(result = case_when(
     result == "Goal" ~ "GOAL",
     result == "Own Goal" ~ "OWN GOAL",
@@ -205,6 +224,13 @@ match_df <- shots_df %>%
   mutate(result = forcats::fct_relevel(result, "GOAL", "Saved Shot",
                                        "On Post", "Blocked Shot", 
                                        "Missed Shots", "OWN GOAL")) %>% 
+  ## 
+  mutate(team_color = case_when(
+    team_name == home_team ~ home_color,
+    team_name == away_team ~ away_color,
+    TRUE ~ NA_character_
+  )) %>% 
+  ## set IDs so that shots can always be arranged in the proper order
   mutate(id = row_number())
 ```
 
@@ -297,12 +323,13 @@ glimpse(match_df_basic_plot)
 This second plotting function takes the plots we created with the previous base shot map function and adds in the specific shot for each row to the base plot. The "plot" that is being passed into this function are all the plots we had saved in the "plot" column of the data frame. We add in a new `geom_point()` for the specific shot recorded in a row and make it bigger in size and in black to make it stand out from the rest of the shots the team took. At the bottom we add in a label for the xG value.  
 
 ```{r}
-add_xG_shot <- function(x, y, xG, plot) {
+add_xG_shot <- function(x, y, xG, team_color, plot) {
   shotxG_map_point <- 
     plot +
     # specific shot point in black and bold
-    geom_point(x = x, y = y, color = "black", 
-               size = 12) +
+    geom_point(x = x, y = y, aes(fill = team_color),
+               size = 12, stroke = 3, shape = 21) +
+    scale_fill_identity() +
     #scale_x_continuous(expand = c(0.01, 0)) +
     ## label for shot point
     geom_label(x = 318, y = 186.5, 
@@ -333,7 +360,7 @@ dfdfdf <- match_df_basic_plot %>%
   ## shot-per-row, using 'plot' as base pass along the 'x', 'y' coordinates and xG value
   ## to "add_xG_shot()` function for each row. 
   ## have empty 'ggplot' column for gt plot-insertion purposes
-  mutate(complete_plot = pmap(list(x, y, xG, plot), add_xG_shot),
+  mutate(complete_plot = pmap(list(x, y, xG, team_color, plot), add_xG_shot),
          ggplot = NA) %>% 
   select(-plot) %>% 
   left_join(match_rollsum_simple, by = "id")
@@ -399,6 +426,15 @@ match_gt_xG_timeline <-
     )
   )
 ```
+
+
+Image files need to be placed in output folder
+
+![Picture of directory organization]()
+
+
+
+
 
 Styling the individual cells of our {gt} table can be done via the `tab_style()` function. Throughout the titles and headers we use the font `Roboto Slab` which is a thicker version of the `Roboto Condensed` font that I use for nearly all of my visualizations. 
 
@@ -467,11 +503,7 @@ match_gt_xG_timeline <-
 
 In this section of the {gt} code we go over the `text_transform()` function for doing two very different operations,  for appending the soccer ball emoji unicode to the "GOAL" or "OWN GOAL" cells and for adding the shot maps we created earlier into the table.
 
-
-
-
-
-
+We can use the `text_transform()` function to pass a inline function that appends the soccer ball emoji unicode next to either "GOAL" or "OWN GOAL" text via `paste()`. In specifying the exact location, we have the columns point to the "result" column and filter for rows that have "GOAL" or "OWN GOAL" in the respective "result" column. 
 
 ```{r}
 match_gt_xG_timeline <- 
@@ -482,7 +514,14 @@ match_gt_xG_timeline <-
       columns = vars(result),
       rows = result %in% c("GOAL", "OWN GOAL")),
     fn = function(x) paste(x, soccer_ball)
-  ) %>% 
+  ) 
+```
+
+To get our shot map plots to show up in the table we pass a different inline function to `text_transform()`. We can use the `ggplot_image()` helper function which generates an HTML fragment of a ggplot object. We `map()` the function over every row in the table to generate the shot maps for every row. The "height" and "aspect_ratio" arguments are passed along to `map()` to set the dimensions for the plot inside the cells of the table. 
+
+```{r}
+match_gt_xG_timeline <- 
+  match_gt_xG_timeline %>% 
   ## add plots into the empty 'ggplot' column
   ## use `ggplot_image()` function and set height and aspect ratio
   text_transform(
@@ -508,7 +547,7 @@ match_gt_xG_timeline <-
   cols_align("center")
 ```
 
-The `tab_options()` function is a very general function that gives you a lot of options for styles similar to `tab_style()` except without having to bother with specifying the location and such. For our purposes I'm using this to add a thick grey border at the top and bottom of the column headers. This can be done ia `tab_style()` like we did for the "left" and "right" vertical borders but I didn't want to bother with the whole `tab_style()` syntax all over again. You could just add another `tab_style()` function and just specify the "sides" in `cells_borders()` to "top" and "bottom" if you want to do it that way. We make the top and bottom borders of the column labels a bit thicker to separate them from the title and the body of the table by setting the width to be `px(5)` (px stands for pixel).
+The `tab_options()` function is a very general function that gives you a lot of options for styles similar to `tab_style()` except without having to bother with specifying the location and such. For our purposes I'm using this to add a thick gray border at the top and bottom of the column headers. This can be done ia `tab_style()` like we did for the "left" and "right" vertical borders but I didn't want to bother with the whole `tab_style()` syntax all over again. You could just add another `tab_style()` function and just specify the "sides" in `cells_borders()` to "top" and "bottom" if you want to do it that way. We make the top and bottom borders of the column labels a bit thicker to separate them from the title and the body of the table by setting the width to be `px(5)` (px stands for pixel).
 
 The "data_row.padding" argument sets the amount of vertical padding to each row of the table while "source_notes.font.size" is fairly self-explanatory. We set the actual text for the source note via the `tab_source_note()` function. Instead of using HTML to style the text, we can use markdown via the `md()` function and style the text using regular markdown syntax. 
 
@@ -531,24 +570,51 @@ match_gt_xG_timeline <-
 ```
 
 
+![]()
+
+[link to complete table]() 
+
+
+# Complete function
+
+We can wrap this all up in a neat function that takes a few useful and flexible arguments so that we can use the code and apply it to other matches.
+
+```{r}
+
+```
 
 
 
+# Examples
 
 
 
+![]()
 
+[Code link]()
 
-Image files need to be placed in output folder
+![]()
 
-![Picture of directory organization]()
+[Code link]()
 
 
 
 
 ## Save online to RPubs
 
+Taking the first three letters of the home and away team via `str_sub()` and then pasting them in to the file name with `glue()`. 
 
+```{r eval=FALSE}
+hom <- home_stats$TEAMS %>% str_sub(., 1, 3)
+awa <- away_stats$TEAMS %>% str_sub(., 1, 3)
+
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap4.html")))
+```
+
+
+```{r eval=FALSE}
+markdown::rpubsUpload(title = "gt-test.html", here::here("RMD/output/LivLee_match_gt_shotmap.html"))
+```
 
 
 
