@@ -87,6 +87,21 @@ necessity to be careful about what colors to use as the main team colors (yellow
 hard to scroll, no freeze panels >>> but made sure to order the columns in a way that it's immediately obvious what column is what regardless of how far down you are in the table.
 
 
+# Packages
+
+THe packages we'll be using are some of the usual tidyverse stalwarts such as {dplyr}, {tidyr}, {ggplot2}, {forcats}, etc. For soccer-specific packages we have the {understatr} package for downloading the data (not shown in this blog post) and the {ggsoccer} package for creating soccer fields in {ggplot2}. Last but certainly not least are {grid} and {gridExtra} which are used for advanced plot assembly. We also use the {extrafont} package to make use of some cool fonts for the table/plots, they're loaded in via the `loadfonts()` call. 
+
+```{r}
+# Packages
+pacman::p_load(dplyr, tidyr, stringr, stringi, purrr,
+               tibble, lubridate, glue, rlang, 
+               ggplot2, grid, gridExtra, 
+               gt, forcats, ggtext, extrafont, ggrepel, 
+               understatr, ggsoccer)
+## Load fonts
+loadfonts(quiet = TRUE)
+```
+
 # Data
 
 Data source: understat.com
@@ -105,6 +120,134 @@ For the average Joe this along with the more recent FBref (advanced metrics prov
 
 It would be a point of interest to create my own xG model based on the variables provided on understat.com by following some of the "how-to" blog posts around the web.
 
+
+Note: Raw xG values for Mane's initial shot: 0.31 while Bobby's goal: 0.82. But you have to adjust xG for a single sequence of possession so I regularly use the code in @joedgallagher's 📝: https://jogall.github.io/2019-01-16-adjusted-xG/ for adjusting them whenever there's a sequence with a rebound. 
+
+The xG totals you see on understats' match pages are using the ADJUSTED values BUT the xG values you see on their shot maps are the RAW values. So do be careful when you're taking shot data from the website because I know a lot of you grab data en masse from there...
+
+
+
+
+
+## Getting the data
+
+
+How to get this data via the {understatr} package from [Ewen Henderson]() is a whole other blog post in of itself so be on the look out for one in the future. As it stands there are a number of blog posts by others that you may want to look into:
+
+*
+
+* 
+
+* 
+
+In the github repo I've included data for a couple of matches so you can play around with it. Nothing is really stopping you from using StatsBomb, Opta, InStat, WyScout, etc. data to create these tables you just need a few extra steps to prepare the data to how I've done it. 
+
+
+```{r}
+raw_match_df <- understatr::get_match_shots(14090)
+
+glimpse(raw_match_df)
+```
+
+
+```{r}
+match_shots_data_clean <- raw_match_df %>% 
+  select(-h_goals, -a_goals) %>% 
+  mutate_at(vars(minute, xG, X, Y, 
+                 player_id, match_id, season), ~ as.numeric(.)) %>% 
+  mutate(xG = if_else(is.na(xG), 0, xG) %>% round(digits = 2),
+         result = case_when(
+           result == "SavedShot" ~ "Saved Shot",
+           result == "BlockedShot" ~ "Blocked Shot",
+           result == "MissedShots" ~ "Missed Shot",
+           result == "ShotOnPost" ~ "On Post",
+           result == "OwnGoal" ~ "Own Goal",
+           TRUE ~ result),
+         situation = case_when(
+           situation == "OpenPlay" ~ "Open Play", 
+           situation == "FromCorner" ~ "From Corner",
+           situation == "DirectFreekick" ~ "From Free Kick",
+           situation == "SetPiece" ~ "Set Piece",
+           TRUE ~ situation),
+         lastAction = case_when(
+           lastAction == "BallRecovery" ~ "Ball Recovery",
+           lastAction == "BallTouch" ~ "Ball Touch",
+           lastAction == "LayOff" ~ "Lay Off",
+           lastAction == "TakeOn" ~ "Take On",
+           lastAction == "Standard" ~ NA_character_,
+           TRUE ~ lastAction),
+         shotType = case_when(
+           shotType == "LeftFoot" ~ "Left Foot",
+           shotType == "RightFoot" ~ "Right Foot",
+           shotType == "OtherBodyPart" ~ "Other",
+           TRUE ~ shotType),
+         lastAction = case_when(
+           lastAction == "HeadPass" ~ "Headed Pass",
+           lastAction == "BlockedPass" ~ "Blocked Pass",
+           lastAction == "OffsidePass" ~ "Offside Pass",
+           lastAction == "CornerAwarded" ~ "Corner Awarded",
+           lastAction == "Throughball" ~ "Through ball",
+           lastAction == "SubstitutionOn" ~ "Subbed On",
+           TRUE ~ lastAction)) %>% 
+  ## create single team_name column based on home or away
+  mutate(team_name = case_when(
+    h_a == "h" ~ h_team,
+    h_a == "a" ~ a_team
+  )) %>% 
+  ## swap over own goals to the other team
+  mutate(team_name = case_when(
+    result == "Own Goal" & team_name == home_team ~ away_team,
+    result == "Own Goal" & team_name == away_team ~ home_team,
+    TRUE ~ team_name)) %>% 
+  mutate(team_name = forcats::as_factor(team_name)) %>% 
+  ## make sure that shots are in order
+  arrange(id) %>% 
+  separate(player, into = c("firstname", "player"), 
+           sep = "\\s", extra = "merge") %>% 
+  ## players like Fabinho are listed without a last name "Tavares"
+  ## so just add their name in again if NA
+  mutate(player = if_else(is.na(player), firstname, player))
+```
+
+
+
+```{r}
+## get minute of last shot
+last_min <- match_shots_data_clean$minute %>% unique() %>% last()
+
+## if last shot happened before 90th minute then change to 90
+if (last_min < 90) {last_min <- 90}
+
+## index of every minute in match
+minute <- c(0:last_min)
+team_name <- c(match_shots_data_clean$h_team,
+               match_shots_data_clean$a_team)
+
+match_rollsumxG <- match_shots_data_clean %>% 
+  full_join(crossing(minute, team_name)) %>% 
+  arrange(minute) %>% 
+  group_by(team_name) %>% 
+  mutate(xG = if_else(is.na(xG), 0, xG) %>% round(digits = 2),
+         rollsum = lag(cumsum(xG))) %>% 
+  ungroup() %>% 
+  mutate(player_label = case_when(
+    result == "Goal" & situation != "Penalty"~ paste0(player, ": ", round(xG, digits = 2), " xG"),
+    result == "Goal" & situation == "Penalty" ~ paste0(player, " (Penalty): ", round(xG, digits = 2), " xG"),
+    result == "Own Goal" ~ paste0(player, " (Own Goal): ", round(xG, digits = 2), " xG"),
+    TRUE ~ ""),
+    rollsum_goal = rollsum + xG,
+    minute_goal = minute + 1) %>% 
+  ## for Minute == 0
+  mutate(rollsum = if_else(is.na(rollsum), 0, rollsum),
+         rollsum_goal = if_else(is.na(rollsum_goal), 0, rollsum_goal)) %>% 
+  ## for Minute 0
+  add_row(team_name = home_team, minute = 0, minute_goal = 0,
+          rollsum = 0, rollsum_goal = 0,
+          xG = 0) %>% 
+  add_row(team_name = away_team, minute = 0, minute_goal = 0,
+          rollsum = 0, rollsum_goal = 0,
+          xG = 0)
+```
 
 ## Shape of data
 
@@ -131,14 +274,39 @@ match_date <- "Sep. 12, 2020"
 
 1. shots_df = match_shots_data_clean
 
+This data frame is the main protagonist for our table and holds pretty much all the essential info we need. You can add/subtract any columns as you see fit from understat or from your own data source here. 
 
+* Minute: Minute of the game that the shot was taken. Note that this doesn't contain seconds so you need to be careful when re-arranging rows. When you get the data via {understatr} the data should come in proper order so the first thing you should do is to create an ID variable so that you always have shots in the same minute in the proper order. 
 
+* result: The result of the shot. "Goal", "Blocked Shot", "Saved Shot", "Own Goal", etc.
+
+* X & Y: Coordinates of the shot location.
+
+* xG: Expected Goals value of the shot taken per understat.com's model.
+
+* firstname & player: Player name. firstname is a column I created myself for the shot time line/ shot maps in a previous step of my viz process. When you're grabbing the data from understat yourself it should already be in one united column. We'll go over the code to combine these together for the table.
+
+* h_a: Home or away team. These are used for matching the team colors to their respective row and is in general useful when you have turned your code into a function and want to set certain conditions depending on whether the team is "home" or "away". 
+
+* player_id & match_id: understat IDs for players and matches. Not used here but good to keep if you're going to be doing other stuff later on. 
+
+* situation: The situation in which the shot took place. "Open Play", "Set Piece", "Penalty", etc. 
+
+* season: Season. Not used here but good to keep if you're doing other stuff with this data. 
+
+* shotType: Type of shot. "Left Foot", "Right Foot", & "Header". 
+
+* date: Date of match. We could use {lubridate} or something to make it look nice but for this example I just manually created a variable "match_date" which you saw when we loaded in all the data. 
+
+* player_assisted: Player that assisted the shot. Do note that "assisted" could mean very trivial things like a small touch or a deflection.
+
+* lastAction: Action that lead to the shot. "Pass", "Dribble", "Take On", "Cross", "Rebound", etc. There are some mystery labels such as "Standard" but we'll be removing them from the data in the code section. 
+
+* team_name: Team name used for labels.
 
 ```{r}
 glimpse(shots_df)
 ```
-
-
 
 2. rollsum_df = match_rollsumxG
 
@@ -149,36 +317,19 @@ Taking the shots_df data frame above, expanding it out for every minute of the g
 cumsum() and lag() functions. Be very careful and make sure that the rows are ordered properly before running this function.
 
 ```{r}
-glimpse(roll_sum_df)
+glimpse(roll_sum_df %>% select(minute, xG, rollsum))
 ```
 
 
 3. home_stats & away_stats 
 
-The box score you see in the "" tab of the match page on understat.com.
+The box score you see in the "Stats" tab of the match page on understat.com. "home_stats" and "away_stats" is just "team_stats" divided into their respective teams. The data below are ONLY used for labels and titles in the plot so if you're not too fussed about being able to scrape the data you could just manually insert them in the text (we'll be using `paste()`/`glue()` to insert this into the plot text) or add the info as arguments to your plotting function and insert this data that way as well.
 
 ```{r}
 glimpse(team_stats)
 ```
 
-
 # Code Breakdown
-
-## Packages
-
-THe packages we'll be using are some of the usual tidyverse stalwarts such as {dplyr}, {tidyr}, {ggplot2}, {forcats}, etc. For soccer-specific packages we have the {understatr} package for downloading the data (not shown in this blog post) and the {ggsoccer} package for creating soccer fields in {ggplot2}. Last but certainly not least are {grid} and {gridExtra} which are used for advanced plot assembly. We also use the {extrafont} package to make use of some cool fonts for the table/plots, they're loaded in via the `loadfonts()` call. 
-
-```{r}
-# Packages
-pacman::p_load(dplyr, tidyr, stringr, stringi, purrr,
-               tibble, lubridate, glue, rlang, 
-               ggplot2, grid, gridExtra, 
-               gt, forcats, ggtext, extrafont, ggrepel, 
-               understatr, ggsoccer)
-## Load fonts
-loadfonts(quiet = TRUE)
-```
-
 
 ## Creating the soccer field plots
 
