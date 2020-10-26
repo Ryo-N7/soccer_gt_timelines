@@ -106,7 +106,7 @@ loadfonts(quiet = TRUE)
 
 Data source: understat.com
 
-Definitions for some variables are provided by hovering over column names on the website. Others are opaque but follow same terminology set by other data companies and websites. 
+Definitions for some variables are provided by hovering over column names on the website. Others are opaque but follow similar terminology set by other data companies and websites. 
 
 Largest concern is over the accuracy of the xG model that understat uses to produce the xG values for shots. 
 
@@ -116,21 +116,18 @@ Most websites don't due to competitiveness of the analytics space
 
 but that is the biggest caveat with using the data as I'm not in control over the specific outputs of these calculated statistics. 
 
-For the average Joe this along with the more recent FBref (advanced metrics provided by StatsBomb) are the best free and publically available websites for obtaining this type of data. 
+For the average Joe this along with the more recent FBref (advanced metrics provided by StatsBomb) are the best free and publicly available websites for obtaining this kind of data. 
 
-It would be a point of interest to create my own xG model based on the variables provided on understat.com by following some of the "how-to" blog posts around the web.
+It would be a point of interest to create my own xG model based on the variables provided on understat.com by following some of the "how-to" blog posts around the web such as: 
 
+* []()
 
-Note: Raw xG values for Mane's initial shot: 0.31 while Bobby's goal: 0.82. But you have to adjust xG for a single sequence of possession so I regularly use the code in @joedgallagher's 📝: https://jogall.github.io/2019-01-16-adjusted-xG/ for adjusting them whenever there's a sequence with a rebound. 
-
-The xG totals you see on understats' match pages are using the ADJUSTED values BUT the xG values you see on their shot maps are the RAW values. So do be careful when you're taking shot data from the website because I know a lot of you grab data en masse from there...
-
+* []()
 
 
 
 
 ## Getting the data
-
 
 How to get this data via the {understatr} package from [Ewen Henderson]() is a whole other blog post in of itself so be on the look out for one in the future. As it stands there are a number of blog posts by others that you may want to look into:
 
@@ -142,9 +139,29 @@ How to get this data via the {understatr} package from [Ewen Henderson]() is a w
 
 In the github repo I've included data for a couple of matches so you can play around with it. Nothing is really stopping you from using StatsBomb, Opta, InStat, WyScout, etc. data to create these tables you just need a few extra steps to prepare the data to how I've done it. 
 
+We'll go over the variables in this data frame in more detail once we've cleaned things up.
 
 ```{r}
-raw_match_df <- understatr::get_match_shots(14090)
+# shots_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_shots_data_clean.RDS")))
+# 
+# roll_sum_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_rollsumxG.RDS")))
+
+home_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_home_stats.RDS")))
+
+away_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_away_stats.RDS")))
+
+team_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_team_stats.RDS")))
+
+home_team = "Liverpool"
+away_team = "Leeds"
+home_color = "#d00027" 
+away_color = "#1D428A"
+match_date <- "Sep. 12, 2020"
+```
+
+```{r}
+match_id <- 14090
+raw_match_df <- understatr::get_match_shots(match_id = match_id)
 
 glimpse(raw_match_df)
 ```
@@ -192,8 +209,9 @@ match_shots_data_clean <- raw_match_df %>%
   ## create single team_name column based on home or away
   mutate(team_name = case_when(
     h_a == "h" ~ h_team,
-    h_a == "a" ~ a_team
-  )) %>% 
+    h_a == "a" ~ a_team)) %>% 
+  ## add colors to teams
+  mutate(team_color = if_else(team_name == h_team, home_color, away_color)) %>% 
   ## swap over own goals to the other team
   mutate(team_name = case_when(
     result == "Own Goal" & team_name == home_team ~ away_team,
@@ -206,10 +224,43 @@ match_shots_data_clean <- raw_match_df %>%
            sep = "\\s", extra = "merge") %>% 
   ## players like Fabinho are listed without a last name "Tavares"
   ## so just add their name in again if NA
-  mutate(player = if_else(is.na(player), firstname, player))
+  mutate(player = if_else(is.na(player), firstname, player),
+         ## overwrite ID numbers so they go from 1 to n.
+         id = row_number())
 ```
 
 
+
+Note: Raw xG values for Mane's initial shot: 0.31 while Bobby's goal: 0.82. But you have to adjust xG for a single sequence of possession so I regularly use the code in @joedgallagher's 📝: https://jogall.github.io/2019-01-16-adjusted-xG/ for adjusting them whenever there's a sequence with a rebound. 
+
+The xG totals you see on understats' match pages are using the ADJUSTED values BUT the xG values you see on their shot maps are the RAW values. So do be careful when you're taking shot data from the website because I know a lot of you grab data en masse from there...
+
+
+99% of the time the discrepancy has been solved by applying this ___ to rebound shots and other shots in the possession sequence. Understat could be doing something else but from my experience this usually matches the values up.
+
+```{r}
+match_shots_data_clean %>% filter(team_name == "Liverpool") -> lfc_xg
+
+lfc_adj <- lfc_xg %>% 
+  filter(minute == 39) %>%
+  mutate(xg_total = (1 - prod(1 - xG))) %>%
+  mutate(xg_adj = xg_total * (xG / sum(xG))) %>% 
+  select(minute, xG, xg_adj, player, situation, lastAction)
+
+glimpse(lfc_adj)
+
+match_shots_data_clean <- match_shots_data_clean %>% 
+  mutate(xG = case_when(
+    minute == 39 & xG == 0.11 ~ 0.1,
+    minute == 39 & xG == 0.09 ~ 0.08, ## 0.855 ... but we'll round down...
+    TRUE ~ xG))
+
+# 3.17 >> 3.15 
+# 0.28 >> 0.27
+```
+
+
+Be very careful and make sure that the rows are ordered properly before running this function.
 
 ```{r}
 ## get minute of last shot
@@ -246,35 +297,24 @@ match_rollsumxG <- match_shots_data_clean %>%
           xG = 0) %>% 
   add_row(team_name = away_team, minute = 0, minute_goal = 0,
           rollsum = 0, rollsum_goal = 0,
-          xG = 0)
+          xG = 0) %>% 
+  ## FOR THIS BLOGPOST // GT TABLE WE DON'T NEED MOST OF THESE COLUMNS
+  ## We'll only use the shot order ID and the rolling sum of xG that we just calculated.
+  filter(xG != 0.00) %>% 
+  select(id, rollsum_goal)
 ```
 
 ## Shape of data
 
 Now let's go over what are the data frames you need to create these tables and plots. 
 
-```{r}
-shots_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_shots_data_clean.RDS")))
-
-roll_sum_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_rollsumxG.RDS")))
-
-home_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_home_stats.RDS")))
-
-away_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_away_stats.RDS")))
-
-team_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_team_stats.RDS")))
-
-home_team = "Liverpool"
-away_team = "Leeds"
-home_color = "#d00027" 
-away_color = "#1D428A"
-match_date <- "Sep. 12, 2020"
-```
-
-
 1. shots_df = match_shots_data_clean
 
 This data frame is the main protagonist for our table and holds pretty much all the essential info we need. You can add/subtract any columns as you see fit from understat or from your own data source here. 
+
+```{r}
+glimpse(shots_df)
+```
 
 * Minute: Minute of the game that the shot was taken. Note that this doesn't contain seconds so you need to be careful when re-arranging rows. When you get the data via {understatr} the data should come in proper order so the first thing you should do is to create an ID variable so that you always have shots in the same minute in the proper order. 
 
@@ -304,22 +344,13 @@ This data frame is the main protagonist for our table and holds pretty much all 
 
 * team_name: Team name used for labels.
 
-```{r}
-glimpse(shots_df)
-```
-
 2. rollsum_df = match_rollsumxG
 
 Has the rolling sum of xG values for the match over every shot taken in the match.
 
-Taking the shots_df data frame above, expanding it out for every minute of the game and the applying the 
-
-cumsum() and lag() functions. Be very careful and make sure that the rows are ordered properly before running this function.
-
 ```{r}
 glimpse(roll_sum_df %>% select(minute, xG, rollsum))
 ```
-
 
 3. home_stats & away_stats 
 
@@ -371,18 +402,10 @@ match_df <- shots_df %>%
     result == "Goal" ~ "GOAL",
     result == "Own Goal" ~ "OWN GOAL",
     TRUE ~ result)) %>% 
-  mutate(result = forcats::as_factor(result)) %>% 
-  mutate(result = forcats::fct_relevel(result, "GOAL", "Saved Shot",
+  mutate(result = forcats::as_factor(result),
+         result = forcats::fct_relevel(result, "GOAL", "Saved Shot",
                                        "On Post", "Blocked Shot", 
-                                       "Missed Shots", "OWN GOAL")) %>% 
-  ## 
-  mutate(team_color = case_when(
-    team_name == home_team ~ home_color,
-    team_name == away_team ~ away_color,
-    TRUE ~ NA_character_
-  )) %>% 
-  ## set IDs so that shots can always be arranged in the proper order
-  mutate(id = row_number())
+                                       "Missed Shots", "OWN GOAL"))
 ```
 
 This is how the data looks like now. There's a row for every shot in chronological order along with the coordinates for the shots.
@@ -494,14 +517,7 @@ add_xG_shot <- function(x, y, xG, team_color, plot) {
 
 ## Combining plots to data frame
 
-Before we create the new plots, we finally work with the data frame that has the rolling xG sums. The IDs should match up with the IDs in `match_df_basic_plot` because the `roll_sum_df` data frame is just an expanded version of `match_df_basic_plot` that created empty rows for every minute. Once you `filter()` out those rows without an xG value the rows for both should match up. Be very careful when manipulating both of these data frames in previous steps as it can become very easy for the IDs to get messed up especially when there are multiple chances by either team in the same minute. Make sure the row order of the shots data frame is exactly as downloaded from `understat.com` before applying the IDs to the rows.
-
-```{r}
-match_rollsum_simple <- roll_sum_df %>% 
-  filter(xG != 0.00) %>% 
-  mutate(id = row_number()) %>% 
-  select(id, rollsum_goal)
-```
+Now we finally work with the data frame that has the rolling xG sums. The IDs should match up with the IDs in `match_df_basic_plot` because the `roll_sum_df` data frame is just an expanded version of `match_df_basic_plot` that created empty rows for every minute. Once you `filter()` out those rows without an xG value the rows for both should match up. Be very careful when manipulating both of these data frames in previous steps as it can become very easy for the IDs to get messed up especially when there are multiple chances by either team in the same minute. Make sure the row order of the shots data frame is exactly as downloaded from `understat.com` before applying the IDs to the rows.
 
 Since we have more than two arguments that we are passing to the `add_xG_shot()` function we need to iterate over every row using the `pmap()` function instead of `map2()`.
 
