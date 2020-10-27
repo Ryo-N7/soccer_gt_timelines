@@ -126,6 +126,11 @@ It would be a point of interest to create my own xG model based on the variables
 
 
 
+# Code Breakdown
+
+We can finally get to the real meat of this blog post which is the code to create all these visualizations. We'll be going through things almost line-by-line and then at the end we'll create a function out of it so it can be applied to other matches/teams as well! 
+
+Let's get started!
 
 ## Getting the data
 
@@ -174,10 +179,9 @@ shots_df <- raw_match_df %>%
   select(-h_goals, -a_goals) %>% 
   mutate_at(vars(minute, xG, X, Y, 
                  player_id, match_id, season), ~ as.numeric(.)) %>% 
-  ## round xG values 
+  ## if xG is NA then set to zero
   ## re-label shot result categories
-  mutate(#xG = if_else(is.na(xG), 0, xG) %>% round(digits = 2),
-         xG = if_else(is.na(xG), 0, xG),
+  mutate(xG = if_else(is.na(xG), 0, xG),
          result = case_when(
            result == "SavedShot" ~ "Saved Shot",
            result == "BlockedShot" ~ "Blocked Shot",
@@ -236,12 +240,9 @@ shots_df <- raw_match_df %>%
 
 
 
-Note: Raw xG values for Mane's initial shot: 0.31 while Bobby's goal: 0.82. But you have to adjust xG for a single sequence of possession so I regularly use the code in @joedgallagher's 📝: https://jogall.github.io/2019-01-16-adjusted-xG/ for adjusting them whenever there's a sequence with a rebound. 
+You have to adjust xG for a single sequence of possession so I regularly use the code in [Joe Gallagher](@joedgallagher)'s [blog post](https://jogall.github.io/2019-01-16-adjusted-xG/) for adjusting them whenever there's a sequence with a rebound. 
 
-The xG totals you see on understats' match pages are using the ADJUSTED values BUT the xG values you see on their shot maps are the RAW values. So do be careful when you're taking shot data from the website because I know a lot of you grab data en masse from there...
-
-
-99% of the time the discrepancy has been solved by applying this ___ to rebound shots and other shots in the possession sequence. Understat could be doing something else but from my experience this usually matches the values up.
+The xG totals (Liverpool `3.15 xG` vs. Leeds United `0.27 xG`) you see on understats' match pages are using the __ADJUSTED__ values __BUT__ the xG values you see on their shot maps (when you hover over them with your mouse) are the __RAW__ values which are the same ones downloaded via {understatr} (and my own bespoke functions too). So do be careful when you're taking shot data from the website. 99% of the time this discrepancy has been solved by applying the below code from Joe's blog post to rebound shots and other shots in that possession sequence. Understat could be doing something else under the hood but from my experience this usually matches the values up.
 
 ```{r}
 shots_df %>% filter(team_name == "Liverpool") -> lfc_xg
@@ -253,7 +254,11 @@ lfc_adj <- lfc_xg %>%
   select(minute, xG, xg_adj, player, situation, lastAction)
 
 glimpse(lfc_adj)
+```
 
+Then we just overwrite the raw xG values in `shots_df`.
+
+```{r}
 shots_df <- shots_df %>% 
   mutate(xG = case_when(
     minute == 39 & id == 10 ~ 0.10171848,
@@ -262,7 +267,7 @@ shots_df <- shots_df %>%
 ```
 
 
-Be very careful and make sure that the rows are ordered properly before running this function.
+## Rolling sum of xG
 
 ```{r}
 ## get minute of last shot
@@ -306,9 +311,9 @@ rollsum_df <- shots_df %>%
   select(id, rollsum_goal)
 ```
 
-## Shape of data
+## Data contents
 
-Now let's go over what are the data frames you need to create these tables and plots. 
+Now that we've got the basic data we need, let's go over what each data frame holds. We'll still be doing a lot more data manipulation after this section but it's a good place to pause as we have the essential columns we need.
 
 1. shots_df
 
@@ -361,8 +366,6 @@ The box score you see in the "Stats" tab of the match page on understat.com. "ho
 ```{r}
 glimpse(team_stats)
 ```
-
-# Code Breakdown
 
 ## Creating the soccer field plots
 
@@ -418,7 +421,7 @@ glimpse(match_df)
 
 Using this data frame we can create shot map plots that will serve as the base for a more detailed plot in a later section.
 
-### Function to define base shot map
+## Function to define base shot map
 
 This function will take the `data` and `team_name` inputs that come from the `match_df` data frame that we just created. This plot will plot **all** shots per team for every row of the data frame. After using `filter()` to only get the shots for the specific team, `annotate_pitch()` is used to create the pitch object using the dimensions we specified in `pitch_custom` earlier. The `theme_pitch()` is a helper function for {ggsoccer} that removes all the background and axes details while `coord_flip()` is used to flip the field so that the goal is at the top of the plot. All the shots will be gray and transparent (via the 'alpha' argument) as later on we will highlight the actual shot for a specific row in our table in a different plotting function. 
 
@@ -491,7 +494,7 @@ match_df_basic_plot <- match_df_basic_plot %>%
 glimpse(match_df_basic_plot)
 ```
 
-### Function to define specific shot map
+## Function to define specific shot map
 
 This second plotting function takes the plots we created with the previous base shot map function and adds in the specific shot for each row to the base plot. The "plot" that is being passed into this function are all the plots we had saved in the "plot" column of the data frame. We add in a new `geom_point()` for the specific shot recorded in a row and make it bigger in size and in black to make it stand out from the rest of the shots the team took. At the bottom we add in a label for the xG value.  
 
@@ -583,21 +586,14 @@ To give rows where the shots are goals a bit of 'oomph' in the table, we will ad
 soccer_ball <- "<span style='color:white;font-size:25px'>&#9917;</span>"
 ```
 
-To start off, we add in the title and team logo images via (extremely bad) HTML code. This is the part I'm least happy with as ideally there wouldn't be a big gap between the score line and the subtitle text while still having the team logo images set on either side of the entire text block. In reality you'd use CSS to have the team logos be independent of the HTML code that does all the styling on the title text but I'm not knowledgeable enough at it at this point. The way I've done it below is the best way I could do it without making it worse. The way I've done it with HTML means that on screens that aren't very wide, the away team's logo will shift downwards and it'll look bad. So let's just say it isn't very mobile friendly right now. To be honest it's only wide-screen monitor friendly at this point! 
+To start off, we add in the title and team logo images via HTML. Something very simple as getting the team logo images to be set to the side of the text took a looooonnggg time and many many iterations because I'm not very good at HTML/CSS but it got done eventually... They key ended up playing around with the margins in the `img` tag.
 
 ```{r}
 match_gt_xG_timeline <- 
   gt(match_shots_table_df) %>% 
   tab_header(   
     title = gt::html("<p><img src='Liverpool_FC.png' alt='LFC' style='float:left;height:190px;margin:0px 50px 0px 150px;'><span style='font-size:35px'>(3.15 xG)</span> <b style='color:#d00027; font-size:55px'>Liverpool</b> <span style='font-size:70px'>4 - </span><span style='font-size:70px'>3</span> <b style='color:#1D428A; font-size:55px'>Leeds</b> <span style='font-size:35px'>(0.27 xG)</span><img src='Leeds_United_FC.png' alt='LUFC' style='float:right;height:190px;margin:0px 150px 0px 50px;'> 
-</p>
-<span style='font-size:40px'>Premier League 2020-2021: Matchday 1 (Sep 12 2020)</span>"
-    )
-  )
-
-
-
-#"<p><img src='Liverpool_FC.png' alt='LFC' style='width:190px;vertical-align:middle;margin:50px 50px 50px 150px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_color}; font-size:55px'>{home_team}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_color}; font-size:55px'>{away_team}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='Leeds_United_FC.png' alt='LUFC' style='width:190px;vertical-align:middle;margin:50px 150px 50px 50px;'></p> <p><span style='font-size:40px'>Premier League 2020-2021: Matchday 1 ({match_date})</span></p>"
+</p><span style='font-size:40px'>Premier League 2020-2021: Matchday 1 (Sep 12 2020)</span>"))
 ```
 
 
