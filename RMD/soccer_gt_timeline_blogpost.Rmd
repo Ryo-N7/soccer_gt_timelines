@@ -137,9 +137,11 @@ How to get this data via the {understatr} package from [Ewen Henderson]() is a w
 
 * 
 
-In the github repo I've included data for a couple of matches so you can play around with it. Nothing is really stopping you from using StatsBomb, Opta, InStat, WyScout, etc. data to create these tables you just need a few extra steps to prepare the data to how I've done it. 
+Nothing is really stopping you from using StatsBomb, Opta, InStat, WyScout, etc. data to create these tables you just need a few extra steps to prepare the data to how I've done it. 
 
 We'll go over the variables in this data frame in more detail once we've cleaned things up.
+
+The variables created at the bottom 
 
 ```{r}
 # shots_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_shots_data_clean.RDS")))
@@ -168,11 +170,14 @@ glimpse(raw_match_df)
 
 
 ```{r}
-match_shots_data_clean <- raw_match_df %>% 
+shots_df <- raw_match_df %>% 
   select(-h_goals, -a_goals) %>% 
   mutate_at(vars(minute, xG, X, Y, 
                  player_id, match_id, season), ~ as.numeric(.)) %>% 
-  mutate(xG = if_else(is.na(xG), 0, xG) %>% round(digits = 2),
+  ## round xG values 
+  ## re-label shot result categories
+  mutate(#xG = if_else(is.na(xG), 0, xG) %>% round(digits = 2),
+         xG = if_else(is.na(xG), 0, xG),
          result = case_when(
            result == "SavedShot" ~ "Saved Shot",
            result == "BlockedShot" ~ "Blocked Shot",
@@ -239,7 +244,7 @@ The xG totals you see on understats' match pages are using the ADJUSTED values B
 99% of the time the discrepancy has been solved by applying this ___ to rebound shots and other shots in the possession sequence. Understat could be doing something else but from my experience this usually matches the values up.
 
 ```{r}
-match_shots_data_clean %>% filter(team_name == "Liverpool") -> lfc_xg
+shots_df %>% filter(team_name == "Liverpool") -> lfc_xg
 
 lfc_adj <- lfc_xg %>% 
   filter(minute == 39) %>%
@@ -249,14 +254,11 @@ lfc_adj <- lfc_xg %>%
 
 glimpse(lfc_adj)
 
-match_shots_data_clean <- match_shots_data_clean %>% 
+shots_df <- shots_df %>% 
   mutate(xG = case_when(
-    minute == 39 & xG == 0.11 ~ 0.1,
-    minute == 39 & xG == 0.09 ~ 0.08, ## 0.855 ... but we'll round down...
+    minute == 39 & id == 10 ~ 0.10171848,
+    minute == 39 & id == 11 ~ 0.08383471,
     TRUE ~ xG))
-
-# 3.17 >> 3.15 
-# 0.28 >> 0.27
 ```
 
 
@@ -264,25 +266,25 @@ Be very careful and make sure that the rows are ordered properly before running 
 
 ```{r}
 ## get minute of last shot
-last_min <- match_shots_data_clean$minute %>% unique() %>% last()
+last_min <- shots_df$minute %>% unique() %>% last()
 
 ## if last shot happened before 90th minute then change to 90
 if (last_min < 90) {last_min <- 90}
 
 ## index of every minute in match
 minute <- c(0:last_min)
-team_name <- c(match_shots_data_clean$h_team,
-               match_shots_data_clean$a_team)
+team_name <- c(shots_df$h_team %>% unique(),
+               shots_df$a_team %>% unique())
 
-match_rollsumxG <- match_shots_data_clean %>% 
+rollsum_df <- shots_df %>% 
   full_join(crossing(minute, team_name)) %>% 
   arrange(minute) %>% 
   group_by(team_name) %>% 
-  mutate(xG = if_else(is.na(xG), 0, xG) %>% round(digits = 2),
+  mutate(xG = if_else(is.na(xG), 0, xG),
          rollsum = lag(cumsum(xG))) %>% 
   ungroup() %>% 
   mutate(player_label = case_when(
-    result == "Goal" & situation != "Penalty"~ paste0(player, ": ", round(xG, digits = 2), " xG"),
+    result == "Goal" & situation != "Penalty" ~ paste0(player, ": ", round(xG, digits = 2), " xG"),
     result == "Goal" & situation == "Penalty" ~ paste0(player, " (Penalty): ", round(xG, digits = 2), " xG"),
     result == "Own Goal" ~ paste0(player, " (Own Goal): ", round(xG, digits = 2), " xG"),
     TRUE ~ ""),
@@ -308,7 +310,7 @@ match_rollsumxG <- match_shots_data_clean %>%
 
 Now let's go over what are the data frames you need to create these tables and plots. 
 
-1. shots_df = match_shots_data_clean
+1. shots_df
 
 This data frame is the main protagonist for our table and holds pretty much all the essential info we need. You can add/subtract any columns as you see fit from understat or from your own data source here. 
 
@@ -344,12 +346,12 @@ glimpse(shots_df)
 
 * team_name: Team name used for labels.
 
-2. rollsum_df = match_rollsumxG
+2. rollsum_df
 
 Has the rolling sum of xG values for the match over every shot taken in the match.
 
 ```{r}
-glimpse(roll_sum_df %>% select(minute, xG, rollsum))
+glimpse(rollsum_df)
 ```
 
 3. home_stats & away_stats 
@@ -442,9 +444,6 @@ create_shotmap_basic <- function(df = data, team_name = team_name) {
 }
 ```
 
-
-Using the above function now we need to 
-
 We `nest()` the data by "team_name" so that when we plot our basic shot maps each row will plot all the shots for each team in "team_name". By "nesting" the data this way we can apply the plotting function to **all** the data for a specific team team. This way we won't be plotting a basic shot map using shot data from both teams. 
 
 ```{r}
@@ -509,7 +508,7 @@ add_xG_shot <- function(x, y, xG, team_color, plot) {
     geom_label(x = 318, y = 186.5, 
                color = "black", size = 20,
                fill = "white", family = "Roboto Slab",
-               label = glue::glue("{xG} xG"))
+               label = glue::glue("{xG %>% round(digits = 2)} xG"))
   
   return(shotxG_map_point)
 }
@@ -530,7 +529,7 @@ dfdfdf <- match_df_basic_plot %>%
   mutate(complete_plot = pmap(list(x, y, xG, team_color, plot), add_xG_shot),
          ggplot = NA) %>% 
   select(-plot) %>% 
-  left_join(match_rollsum_simple, by = "id")
+  left_join(rollsum_df, by = "id")
 ```
 
 We can check the data frame for the plot in the first row, which is the first shot in the game from Mo Salah in the 7th minute.
@@ -544,8 +543,6 @@ Now for a plot for a row where the team is Leeds United. You can see that the pl
 ```{r}
 dfdfdf$complete_plot[[4]]
 ```
-
-shot points could be color of team. rather keep consistently black as some colors might not work so well as solid points >>> use black as the stroke outline?
 
 ## Tidying up to prep for table creation
 
@@ -565,7 +562,10 @@ match_shots_table_df <- dfdfdf %>%
          situation, type = shotType, player_assisted, lastAction) %>% 
   ## player name labels, clean "lastAction"
   mutate(player_name = paste(firstname, player),
-         lastAction = if_else(lastAction == "None", NA_character_, lastAction)) %>% 
+         lastAction = if_else(lastAction == "None", NA_character_, lastAction),
+         xG = xG %>% round(digits = 2),
+         rollsum = rollsum %>% round(digits = 2)
+         ) %>% 
   ## NAs as blanks
   mutate(across(where(is.character), ~ replace_na(., ""))) %>% 
   ## take out extraneous name vars and move to after team name
@@ -583,7 +583,7 @@ To give rows where the shots are goals a bit of 'oomph' in the table, we will ad
 soccer_ball <- "<span style='color:white;font-size:25px'>&#9917;</span>"
 ```
 
-To start off, we add in the title and team logo images via (extremely bad) HTML code. This is the part I'm least happy with as ideally there wouldn't be a big gap between the score line and the subtitle text while still having the team logo images set on either side of the entire text block. In reality you'd use CSS to have the team logos be independent of the HTML code that does all the styling on the title text but I'm not knowledgeable enough at it at this point. The way I've done it below is the best way I could do it without making it worse. 
+To start off, we add in the title and team logo images via (extremely bad) HTML code. This is the part I'm least happy with as ideally there wouldn't be a big gap between the score line and the subtitle text while still having the team logo images set on either side of the entire text block. In reality you'd use CSS to have the team logos be independent of the HTML code that does all the styling on the title text but I'm not knowledgeable enough at it at this point. The way I've done it below is the best way I could do it without making it worse. The way I've done it with HTML means that on screens that aren't very wide, the away team's logo will shift downwards and it'll look bad. So let's just say it isn't very mobile friendly right now. To be honest it's only wide-screen monitor friendly at this point! 
 
 ```{r}
 match_gt_xG_timeline <- 
@@ -697,6 +697,15 @@ match_gt_xG_timeline <-
       map(match_shots_table_df$complete_plot, ggplot_image, height = px(150), aspect_ratio = 2)
     }
   )
+
+
+# match_gt_xG_timeline %>% 
+#   fmt_number(
+#     columns = vars(xG, rollsum),
+#     n_sigfig = 3,
+#     drop_trailing_zeros = FALSE
+#   ) %>% 
+#   cols_hide(vars(complete_plot))
 ```
 
 Using the `cols_label()` function we can easily re-name all of the column headers to a more table-friendly name. The `cols_align()` is used to align the text of columns. 
@@ -775,7 +784,7 @@ Taking the first three letters of the home and away team via `str_sub()` and the
 hom <- home_stats$TEAMS %>% str_sub(., 1, 3)
 awa <- away_stats$TEAMS %>% str_sub(., 1, 3)
 
-gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap4.html")))
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap7.html")))
 ```
 
 
