@@ -589,9 +589,15 @@ To start off, we add in the title and team logo images via (extremely bad) HTML 
 match_gt_xG_timeline <- 
   gt(match_shots_table_df) %>% 
   tab_header(   
-    title = gt::html(glue::glue("<p><img src='Liverpool_FC.png' alt='LFC' style='width:190px;vertical-align:middle;margin:50px 50px 50px 150px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_color}; font-size:55px'>{home_team}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_color}; font-size:55px'>{away_team}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='Leeds_United_FC.png' alt='LUFC' style='width:190px;vertical-align:middle;margin:50px 150px 50px 50px;'></p> <p><span style='font-size:40px'>Premier League 2020-2021: Matchday 1 ({match_date})</span></p>")
+    title = gt::html("<p><img src='Liverpool_FC.png' alt='LFC' style='float:left;width:150px;height:150px;'><span style='font-size:35px'>(3.15 xG)</span> <b style='color:#d00027; font-size:55px'>Liverpool</b> <span style='font-size:70px'>4 - </span><span style='font-size:70px'>3</span> <b style='color:#1D428A; font-size:55px'>Leeds</b> <span style='font-size:35px'>(0.27 xG)</span><img src='Leeds_United_FC.png' alt='LUFC' style='float:right;width:150px;height:150px;'> 
+</p>
+<span style='font-size:40px'>Premier League 2020-2021: Matchday 1 (Sep 12 2020)</span>"
     )
   )
+
+
+
+#"<p><img src='Liverpool_FC.png' alt='LFC' style='width:190px;vertical-align:middle;margin:50px 50px 50px 150px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_color}; font-size:55px'>{home_team}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_color}; font-size:55px'>{away_team}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='Leeds_United_FC.png' alt='LUFC' style='width:190px;vertical-align:middle;margin:50px 150px 50px 50px;'></p> <p><span style='font-size:40px'>Premier League 2020-2021: Matchday 1 ({match_date})</span></p>"
 ```
 
 
@@ -784,7 +790,7 @@ Taking the first three letters of the home and away team via `str_sub()` and the
 hom <- home_stats$TEAMS %>% str_sub(., 1, 3)
 awa <- away_stats$TEAMS %>% str_sub(., 1, 3)
 
-gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap7.html")))
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap8.html")))
 ```
 
 
