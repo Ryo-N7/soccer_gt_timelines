@@ -95,6 +95,7 @@ THe packages we'll be using are some of the usual tidyverse stalwarts such as {d
 # Packages
 pacman::p_load(dplyr, tidyr, stringr, stringi, purrr,
                tibble, lubridate, glue, rlang, 
+               rvest, polite,
                ggplot2, grid, gridExtra, 
                gt, forcats, ggtext, extrafont, ggrepel, 
                understatr, ggsoccer)
@@ -102,7 +103,7 @@ pacman::p_load(dplyr, tidyr, stringr, stringi, purrr,
 loadfonts(quiet = TRUE)
 ```
 
-# Data
+# Data Source
 
 Data source: understat.com
 
@@ -126,38 +127,36 @@ It would be a point of interest to create my own xG model based on the variables
 
 
 
-# Code Breakdown
+# Code Breakdown (Part 1)
 
 We can finally get to the real meat of this blog post which is the code to create all these visualizations. We'll be going through things almost line-by-line and then at the end we'll create a function out of it so it can be applied to other matches/teams as well! 
 
 Let's get started!
 
-## Getting the data
+## {understatr} Package
 
-How to get this data via the {understatr} package from [Ewen Henderson]() is a whole other blog post in of itself so be on the look out for one in the future. As it stands there are a number of blog posts by others that you may want to look into:
+You can get the data via the {understatr} package from [Ewen Henderson](). There are a number of blog posts that you may want to look into:
 
-*
+* []() by []()
 
-* 
-
-* 
+* []() by []()
 
 Nothing is really stopping you from using StatsBomb, Opta, InStat, WyScout, etc. data to create these tables you just need a few extra steps to prepare the data to how I've done it. 
 
 We'll go over the variables in this data frame in more detail once we've cleaned things up.
 
-The variables created at the bottom 
+The variables created at the bottom will be used throughout the code and are usually appended to the data frames we'll be creating and cleaning. Make sure that the "home_team" and "away_team" variables are the exact names for the teams on understat.com but without the `_` symbols. 
 
 ```{r}
 # shots_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_shots_data_clean.RDS")))
 # 
 # roll_sum_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_rollsumxG.RDS")))
 
-home_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_home_stats.RDS")))
-
-away_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_away_stats.RDS")))
-
-team_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_team_stats.RDS")))
+# home_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_home_stats.RDS")))
+# 
+# away_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_away_stats.RDS")))
+# 
+# team_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_team_stats.RDS")))
 
 home_team = "Liverpool"
 away_team = "Leeds"
@@ -166,6 +165,8 @@ away_color = "#1D428A"
 match_date <- "Sep. 12, 2020"
 ```
 
+To get match shot data for a match you need to find the match ID on understat. There are a number of helper functions to help you find this ID but you can just go to understat and find it yourself as the ID is part of the URL for the match page. Another way is to scrape the team's page on understat and then you'll have the match IDs for that team (including for matches they haven't played yet).  [https://understat.com/match/14090](https://understat.com/match/14090) is the URL for Liverpool vs. Leeds United and then set of digits at the end, `14090`, is the match ID. You use this ID as the input to the `get_match_shots()` function to get the raw match shots data. 
+
 ```{r}
 match_id <- 14090
 raw_match_df <- understatr::get_match_shots(match_id = match_id)
@@ -173,12 +174,35 @@ raw_match_df <- understatr::get_match_shots(match_id = match_id)
 glimpse(raw_match_df)
 ```
 
+The raw data we get is already in good shape thanks to {understatr} but we still need to do some more. 
+
+1. Take out 2 columns we don't really need.
+
+2. Make sure the selected columns are set to numeric type.
+
+3. If xG is `NA` then set it to 0.
+
+4. Relabel the categories in "result", "situation", "lastAction", and "shotType" columns so they're more human-friendly and presentable.
+
+5. Consolidate team name into a single column "team_name" based on the "h_a" column.
+
+6. Add team colors to the row depending on the team.
+
+7. Own Goal is set to the team that conceded it so swap it to the team that actually scored from it.
+
+8. Set "team_name" as a factor variable.
+
+9. Arrange the rows by `id` so that shots are in order chronologically.
+
+10. Separate "player" into two, then re-combine.
+
+11. Set a new cleaner ID for shots so that it starts at 1 and goes to `n`.
 
 ```{r}
 shots_df <- raw_match_df %>% 
   select(-h_goals, -a_goals) %>% 
-  mutate_at(vars(minute, xG, X, Y, 
-                 player_id, match_id, season), ~ as.numeric(.)) %>% 
+  mutate(across(c(minute, xG, X, Y, 
+                 player_id, match_id, season), as.numeric)) %>% 
   ## if xG is NA then set to zero
   ## re-label shot result categories
   mutate(xG = if_else(is.na(xG), 0, xG),
@@ -201,20 +225,18 @@ shots_df <- raw_match_df %>%
            lastAction == "LayOff" ~ "Lay Off",
            lastAction == "TakeOn" ~ "Take On",
            lastAction == "Standard" ~ NA_character_,
-           TRUE ~ lastAction),
-         shotType = case_when(
-           shotType == "LeftFoot" ~ "Left Foot",
-           shotType == "RightFoot" ~ "Right Foot",
-           shotType == "OtherBodyPart" ~ "Other",
-           TRUE ~ shotType),
-         lastAction = case_when(
            lastAction == "HeadPass" ~ "Headed Pass",
            lastAction == "BlockedPass" ~ "Blocked Pass",
            lastAction == "OffsidePass" ~ "Offside Pass",
            lastAction == "CornerAwarded" ~ "Corner Awarded",
            lastAction == "Throughball" ~ "Through ball",
            lastAction == "SubstitutionOn" ~ "Subbed On",
-           TRUE ~ lastAction)) %>% 
+           TRUE ~ lastAction),
+         shotType = case_when(
+           shotType == "LeftFoot" ~ "Left Foot",
+           shotType == "RightFoot" ~ "Right Foot",
+           shotType == "OtherBodyPart" ~ "Other",
+           TRUE ~ shotType)) %>% 
   ## create single team_name column based on home or away
   mutate(team_name = case_when(
     h_a == "h" ~ h_team,
@@ -236,9 +258,9 @@ shots_df <- raw_match_df %>%
   mutate(player = if_else(is.na(player), firstname, player),
          ## overwrite ID numbers so they go from 1 to n.
          id = row_number())
+
+glimpse(shots_df)
 ```
-
-
 
 You have to adjust xG for a single sequence of possession so I regularly use the code in [Joe Gallagher](@joedgallagher)'s [blog post](https://jogall.github.io/2019-01-16-adjusted-xG/) for adjusting them whenever there's a sequence with a rebound. 
 
@@ -311,11 +333,65 @@ rollsum_df <- shots_df %>%
   select(id, rollsum_goal)
 ```
 
-## Data contents
+## Team Stats (Box score data frame)
 
-Now that we've got the basic data we need, let's go over what each data frame holds. We'll still be doing a lot more data manipulation after this section but it's a good place to pause as we have the essential columns we need.
+This is the data you can see on the "Stats" tab on the match page. In my own work flow this code is its own function along with a few additions which aren't pertinent to creating the tables. 
 
-1. shots_df
+```{r}
+match_url <- stringr::str_glue("https://understat.com/match/{match_id}")
+
+match_page <- polite::bow(match_url)
+
+team_stats_raw <- polite::scrape(match_page) %>% 
+  html_nodes("div.scheme-block:nth-child(4)") %>% 
+  html_text() %>% 
+  str_remove_all(., "CHANCES") %>% 
+  str_remove_all(., "([0-9]{2,}%)") %>% 
+  str_replace_all(., "SHOTS ON TARGET", "ON-TARGET") %>% 
+  str_squish()
+
+## make sure that you set "home_team" and "away_team" in the beginning as they are on understat.com
+if (str_detect(home_team, " ") == TRUE | 
+    str_detect(away_team, " ") == TRUE) {
+  
+  home_team_sp <- str_replace_all(home_team, " ", "-")
+  away_team_sp <- str_replace_all(away_team, " ", "-")
+  
+  team_stats_raw <- team_stats_raw %>% 
+    str_replace_all(., home_team, home_team_sp) %>% 
+    str_replace_all(., away_team, away_team_sp)
+}
+
+home_team_sp <- str_replace_all(home_team, " ", "-")
+away_team_sp <- str_replace_all(away_team, " ", "-")
+
+team_stats <- team_stats_raw %>% 
+  read.table(text = ., header = FALSE, sep = " ",
+             col.names = c("var_name", "home", "away")) %>% 
+  t() %>% 
+  tibble::as_tibble(.name_repair = "minimal") %>% 
+  janitor::row_to_names(row_number = 1) %>% 
+  mutate_at(vars(-TEAMS), ~ as.numeric(.)) %>% 
+  mutate(TEAMS = case_when(
+    str_detect(TEAMS, home_team_sp) ~ home_team,
+    str_detect(TEAMS, away_team_sp) ~ away_team,
+    TRUE ~ TEAMS
+  ))
+
+home_stats <- team_stats[1,]
+
+away_stats <- team_stats[2,]
+
+glimpse(team_stats)
+```
+
+You can check out more on how to scrape websites responsibly with the {rvest} and {polite} packages in my previous blog post [here]().
+
+# Data contents
+
+Now that we've got the basic data we need, let's go over what each data frame holds. We'll still be doing a lot more data manipulation after this section but it's a good place to pause as we have the essential columns we need. These are also the data frames we'll pass as arguments into the function we'll create for the table. In my usual workflow the above Part 1 are usually a few different functions and then the code in Part 2 and Part 3 are in a different single function that creates the {gt} tables. You can certainly shove Part 1 code into the overall function as well but I use the data frames from Part 1 in other visualizations so I have them split up.
+
+## 1. shots_df
 
 This data frame is the main protagonist for our table and holds pretty much all the essential info we need. You can add/subtract any columns as you see fit from understat or from your own data source here. 
 
@@ -351,7 +427,7 @@ glimpse(shots_df)
 
 * team_name: Team name used for labels.
 
-2. rollsum_df
+## 2. rollsum_df
 
 Has the rolling sum of xG values for the match over every shot taken in the match.
 
@@ -359,13 +435,15 @@ Has the rolling sum of xG values for the match over every shot taken in the matc
 glimpse(rollsum_df)
 ```
 
-3. home_stats & away_stats 
+## 3. home_stats & away_stats 
 
 The box score you see in the "Stats" tab of the match page on understat.com. "home_stats" and "away_stats" is just "team_stats" divided into their respective teams. The data below are ONLY used for labels and titles in the plot so if you're not too fussed about being able to scrape the data you could just manually insert them in the text (we'll be using `paste()`/`glue()` to insert this into the plot text) or add the info as arguments to your plotting function and insert this data that way as well.
 
 ```{r}
 glimpse(team_stats)
 ```
+
+# Code Breakdown (Part 2)
 
 ## Creating the soccer field plots
 
@@ -494,6 +572,10 @@ match_df_basic_plot <- match_df_basic_plot %>%
 glimpse(match_df_basic_plot)
 ```
 
+I like to think of it as "KABOOM"-ing the "data" column so all its contents explode back out into your data frame. 
+
+![kaboom-parksrec](https://media1.tenor.com/images/4220d6aaaeb915408bd52f456e27b054/tenor.gif)
+
 ## Function to define specific shot map
 
 This second plotting function takes the plots we created with the previous base shot map function and adds in the specific shot for each row to the base plot. The "plot" that is being passed into this function are all the plots we had saved in the "plot" column of the data frame. We add in a new `geom_point()` for the specific shot recorded in a row and make it bigger in size and in black to make it stand out from the rest of the shots the team took. At the bottom we add in a label for the xG value.  
@@ -578,13 +660,17 @@ match_shots_table_df <- dfdfdf %>%
 glimpse(match_shots_table_df)
 ```
 
-## The table
+# Code Breakdown (Part 3)
+
+## Soccer ball emoji
 
 To give rows where the shots are goals a bit of 'oomph' in the table, we will add a soccer ball emoji next to the all-caps "GOAL" text. We can add in the unicode version of the emoji as an object that we'll then `paste()` into the text. From my attempts it only works well for the `.HTML` output and for the `.PNG` output I use for my regular match summary graphics I have to use a "star" emoji instead as the soccer ball one doesn't render too well in `.PNG`.
 
 ```{r}
 soccer_ball <- "<span style='color:white;font-size:25px'>&#9917;</span>"
 ```
+
+## Table Headline/Title & Team Logos
 
 To start off, we add in the title and team logo images via HTML. Something very simple as getting the team logo images to be set to the side of the text took a looooonnggg time and many many iterations because I'm not very good at HTML/CSS but it got done eventually... They key ended up playing around with the margins in the `img` tag.
 
@@ -603,7 +689,7 @@ Image files need to be placed in output folder
 
 
 
-
+## Table Text Style
 
 Styling the individual cells of our {gt} table can be done via the `tab_style()` function. Throughout the titles and headers we use the font `Roboto Slab` which is a thicker version of the `Roboto Condensed` font that I use for nearly all of my visualizations. 
 
@@ -644,6 +730,8 @@ match_gt_xG_timeline <-
   ) 
 ```
 
+## Table Row Color Fill
+
 To style the rows for either team we have to do a bit more in the `locations` argument of `tab_style()`. Using `filter()`-style syntax we specify the rows so that the `team_name` column matches the value of either the `home_team` (Liverpool) or `away_team` (Leeds United). For rows where Liverpool took a shot we fill the cells with `home_color` "red" and for Leeds `away_color` or "blue". We specified the `home_color` and `away_color` variables at the beginning of the tutorial. When all of this code is turned into a function, you would have these variables set as arguments to the table-making function so you can easily specify any color hex code as needed. 
 
 ```{r}
@@ -670,6 +758,8 @@ match_gt_xG_timeline <-
   ) 
 ```
 
+## Goal/Own Goal Rows
+
 In this section of the {gt} code we go over the `text_transform()` function for doing two very different operations,  for appending the soccer ball emoji unicode to the "GOAL" or "OWN GOAL" cells and for adding the shot maps we created earlier into the table.
 
 We can use the `text_transform()` function to pass a inline function that appends the soccer ball emoji unicode next to either "GOAL" or "OWN GOAL" text via `paste()`. In specifying the exact location, we have the columns point to the "result" column and filter for rows that have "GOAL" or "OWN GOAL" in the respective "result" column. 
@@ -685,6 +775,8 @@ match_gt_xG_timeline <-
     fn = function(x) paste(x, soccer_ball)
   ) 
 ```
+
+## Appending Shot Map Plots
 
 To get our shot map plots to show up in the table we pass a different inline function to `text_transform()`. We can use the `ggplot_image()` helper function which generates an HTML fragment of a ggplot object. We `map()` the function over every row in the table to generate the shot maps for every row. The "height" and "aspect_ratio" arguments are passed along to `map()` to set the dimensions for the plot inside the cells of the table. 
 
@@ -710,6 +802,8 @@ match_gt_xG_timeline <-
 #   cols_hide(vars(complete_plot))
 ```
 
+## Rename Columns
+
 Using the `cols_label()` function we can easily re-name all of the column headers to a more table-friendly name. The `cols_align()` is used to align the text of columns. 
 
 ```{r}
@@ -724,6 +818,8 @@ match_gt_xG_timeline <-
   ) %>% 
   cols_align("center")
 ```
+
+## Other Table Options & Source Notes
 
 The `tab_options()` function is a very general function that gives you a lot of options for styles similar to `tab_style()` except without having to bother with specifying the location and such. For our purposes I'm using this to add a thick gray border at the top and bottom of the column headers. This can be done ia `tab_style()` like we did for the "left" and "right" vertical borders but I didn't want to bother with the whole `tab_style()` syntax all over again. You could just add another `tab_style()` function and just specify the "sides" in `cells_borders()` to "top" and "bottom" if you want to do it that way. We make the top and bottom borders of the column labels a bit thicker to separate them from the title and the body of the table by setting the width to be `px(5)` (px stands for pixel).
 
@@ -755,44 +851,57 @@ match_gt_xG_timeline <-
 
 # Complete function
 
-We can wrap this all up in a neat function that takes a few useful and flexible arguments so that we can use the code and apply it to other matches.
+We can wrap this all up in a neat function that takes a few useful and flexible arguments so that we can use the code and apply it to other matches. We'll use the inputs we created up to Part 1 as the arguments to pass to the function so the function will contain all the code from Part 2 and Part 3.
 
 ```{r}
+home_team = "Liverpool"
+away_team = "Leeds"
+home_color = "#d00027" 
+away_color = "#1D428A"
+match_date <- "Sep. 12, 2020"
 
+
+create_timeline_table <- function()
 ```
 
 
-
-# Examples
-
-
-
-![]()
-
-[Code link]()
-
-![]()
-
-[Code link]()
-
-
+```{r eval=FALSE}
+create_timeline_table()
+```
 
 
 ## Save online to RPubs
 
-Taking the first three letters of the home and away team via `str_sub()` and then pasting them in to the file name with `glue()`. 
+Taking the first three letters of the home and away team via `str_sub()` and then pasting them in to the file name with `glue()` we can save our table with the `gtsave()` function with a uniform naming style. If you want to save tables for an entire team's matches in a season I recommend you put the Match Day number or some other identifier first so you can sort it nicely in a folder.
 
 ```{r eval=FALSE}
 hom <- home_stats$TEAMS %>% str_sub(., 1, 3)
 awa <- away_stats$TEAMS %>% str_sub(., 1, 3)
 
+## Save the table in the RMD/output folder in your directory:
 gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap11.html")))
 ```
 
+Alternatively you can upload it directly to your RPub account on the web using `markdown::rpubsUpload()`. It'll direct you to the RPubs website where you'll be required to log-in or create an account. It's free and its a nice place to host your R web related stuff. Most people use it to host their presentations or analyses notebooks. 
 
 ```{r eval=FALSE}
-markdown::rpubsUpload(title = "gt-test.html", here::here("RMD/output/LivLee_match_gt_shotmap.html"))
+markdown::rpubsUpload(title = "gt-test.html", htmlFile = here::here("RMD/output/LivLee_match_gt_shotmap.html"))
 ```
+
+# Examples
+
+We can run the same function for other matches from understat. You can modify the inputs/code a bit and use your own data or other data sources as well. 
+
+![]()
+
+[Code link]()
+
+![]()
+
+[Code link]()
+
+
+
 
 
 
