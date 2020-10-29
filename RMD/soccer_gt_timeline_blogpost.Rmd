@@ -22,13 +22,13 @@ expected goals as a concept is still the most widely-accepted metric by the gene
 
 For R users who want to dabble I highly recommend the following:
 
-- 
+- [Fitting your own football xG model - Dato Futbol](https://www.datofutbol.cl/xg-model/) by [Ismael Gomez](https://twitter.com/DatoFutbol_cl)
 
-- 
+- [xG Model - Design and Implementation with R Tidymodels](https://www.thesignificantgame.com/portfolio/expected-goals-model-with-tidymodels/) by [Lars M.](https://twitter.com/thesignigame)
 
-I started out in soccer analytics mainly to practice my data cleaning and visualization skills and over time it evolved into an entire portfolio of plots and graphs that you can see in []().
+I started out in soccer analytics mainly to practice my data cleaning and visualization skills and over time it evolved into an entire portfolio of plots and graphs that you can see in the [soccer_ggplots Github Repo](https://github.com/Ryo-N7/soccer_ggplots).
 
-At the beginning of last season I figured out how to grab match-level data from [understat.com]() via [Ewen Henderson]()'s [{understatr}]() package and set about creating a "matchday summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the general public. 
+At the beginning of last season I figured out how to grab match-level data from [understat.com]() via [Ewen Henderson]()'s [{understatr}]() package and started creating a "matchday summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the general public. 
 
 Version 1 looked like this:
 
@@ -55,10 +55,6 @@ So here are the new xG summary timelines:
 ![]()
 
 
-
-
-# Target Audience
-
 # Design Choices
 
 
@@ -66,23 +62,27 @@ The color-coding of the rows is intended to give you a clear idea of who were do
 
 
 
+Most of the plots you see inserted into {gt} or other R tables in general are spark lines so I though about including them in mine too. 
+
 - sparkline timeline: no, cum xg covers that and can't see plot point easily in graph. also the nature of the chronological setup already means you get that aspect of the game anyways
 better to focus on something that's easier to see at first glance as highlights the main idea of the table >> shost. 
 
 bold text
 emphasize GOALS, OWN GOALS 
-add emoji to further highlight (regular version uses a star emoji instead due to HTML-to-PNG conversion issues)
+add emoji to further highlight (regular version uses a star emoji instead due to HTML-to-PNG conversion issues with the soccer emoji)
 
-title text: different sizes >> focus on actual score line then down to xG 
+title text: Experimented with different sizes . Still not sure how the text alignment (especially vertical) works so I didn't want to try anything too drastic.
+
+ focus on **actual** score line then down to **xG**. I have Expected Points (xPoints) in the other graphic but for the stand-alone version of the tables it might be prudent to include them somehow in a later iteration. 
 
 
 Concerns:
 
 large size of file
 
-inexperience with HTML/CSS to get team logos to slot in on either side of the title text.
+inexperience with HTML/CSS to get team logos to slot in on either side of the title text which was only solved after hours upon hours of attempts.
 
-necessity to be careful about what colors to use as the main team colors (yellow for example is strictly off-limits)
+necessity to be careful about what colors to use as the main team colors (yellow for example is strictly off-limits). Potential for a dark theme design to alleviate some concerns with using yellow or other brighter colors that don't work well with white text.
 
 hard to scroll, no freeze panels >>> but made sure to order the columns in a way that it's immediately obvious what column is what regardless of how far down you are in the table.
 
@@ -133,37 +133,39 @@ We can finally get to the real meat of this blog post which is the code to creat
 
 Let's get started!
 
-## {understatr} Package
+## Defining Variables
 
-You can get the data via the {understatr} package from [Ewen Henderson](). There are a number of blog posts that you may want to look into:
+The variables defined below will be used throughout the code and are usually appended to the data frames we'll be creating and cleaning. They'll also be used as arguments for a function we'll create that takes in all the code that'll be described throughout this blog post. 
 
-* []() by []()
+Make sure that the "home_team" and "away_team" variables are the exact names for the teams on understat.com but without the `_` symbols (e.g. "West_Ham" should be "West Ham", "Borussia_M.Gladbach" should be "Borussia M.Gladbach"). The underscores will be converted throughout the code so don't worry about them. You have to be careful as some teams on understat.com are labeled with their full name ("West_Bromwich_Albion", "Parma_Calcio_1913") while some other ones aren't ("Tottenham", "Brighton", "Leeds").
 
-* []() by []()
+The team color is your choice but the table will be using **white** text so be sure to not choose yellow or white. For teams like Borussia Dortmund I usually just choose **black**. There are a number of great web sites for finding team colors such as: 
 
-Nothing is really stopping you from using StatsBomb, Opta, InStat, WyScout, etc. data to create these tables you just need a few extra steps to prepare the data to how I've done it. 
+* [Encycolorpedia](https://encycolorpedia.com/)
 
-We'll go over the variables in this data frame in more detail once we've cleaned things up.
+* [Team Color Codes](https://teamcolorcodes.com/)
 
-The variables created at the bottom will be used throughout the code and are usually appended to the data frames we'll be creating and cleaning. Make sure that the "home_team" and "away_team" variables are the exact names for the teams on understat.com but without the `_` symbols. 
+* [Team Colours App - FC Python](https://teamcolours.netlify.app/)
+
+Finally you can set the match date to show in the table title here in whatever format you wish. You can actually scrape this via {understatr} as well but I didn't want to bother reformatting with {lubridate} so I just set it manually here.
 
 ```{r}
-# shots_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_shots_data_clean.RDS")))
-# 
-# roll_sum_df <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_match_rollsumxG.RDS")))
-
-# home_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_home_stats.RDS")))
-# 
-# away_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_away_stats.RDS")))
-# 
-# team_stats <- readRDS(file = here::here(glue::glue("data/LFC_LUFC_MD1_team_stats.RDS")))
-
 home_team = "Liverpool"
 away_team = "Leeds"
 home_color = "#d00027" 
 away_color = "#1D428A"
 match_date <- "Sep. 12, 2020"
 ```
+
+## {understatr} Package
+
+You can get the data via the {understatr} package from [Ewen Henderson](). There are a number of blog posts that you may want to look into:
+
+* [Shot Data for Top 5 European Leagues](https://biscuitchaserfc.blogspot.com/2020/09/shot-data-for-top-5-european-leagues.html) by [Mark Wilkins](https://twitter.com/biscuitchaser/)
+
+* [Visualizing the Copa America 2019](https://ryo-n7.github.io/2019-06-18-visualize-copa-america/)
+
+Nothing is really stopping you from using StatsBomb, Opta, InStat, WyScout, etc. data to create these tables you just need a few extra steps to prepare the data to how I've done it. 
 
 To get match shot data for a match you need to find the match ID on understat. There are a number of helper functions to help you find this ID but you can just go to understat and find it yourself as the ID is part of the URL for the match page. Another way is to scrape the team's page on understat and then you'll have the match IDs for that team (including for matches they haven't played yet).  [https://understat.com/match/14090](https://understat.com/match/14090) is the URL for Liverpool vs. Leeds United and then set of digits at the end, `14090`, is the match ID. You use this ID as the input to the `get_match_shots()` function to get the raw match shots data. 
 
@@ -176,35 +178,15 @@ glimpse(raw_match_df)
 
 The raw data we get is already in good shape thanks to {understatr} but we still need to do some more. 
 
-1. Take out 2 columns we don't really need.
-
-2. Make sure the selected columns are set to numeric type.
-
-3. If xG is `NA` then set it to 0.
-
-4. Relabel the categories in "result", "situation", "lastAction", and "shotType" columns so they're more human-friendly and presentable.
-
-5. Consolidate team name into a single column "team_name" based on the "h_a" column.
-
-6. Add team colors to the row depending on the team.
-
-7. Own Goal is set to the team that conceded it so swap it to the team that actually scored from it.
-
-8. Set "team_name" as a factor variable.
-
-9. Arrange the rows by `id` so that shots are in order chronologically.
-
-10. Separate "player" into two, then re-combine.
-
-11. Set a new cleaner ID for shots so that it starts at 1 and goes to `n`.
-
 ```{r}
 shots_df <- raw_match_df %>% 
+  ## 1. Take out 2 columns we don't really need.
   select(-h_goals, -a_goals) %>% 
+  ## 2. Make sure the selected columns are set to numeric type.
   mutate(across(c(minute, xG, X, Y, 
                  player_id, match_id, season), as.numeric)) %>% 
-  ## if xG is NA then set to zero
-  ## re-label shot result categories
+  ## 3. If xG is `NA` then set it to 0.
+  ## 4. Relabel the categories in "result", "situation", "lastAction", and "shotType" columns so they're more human-friendly and presentable.
   mutate(xG = if_else(is.na(xG), 0, xG),
          result = case_when(
            result == "SavedShot" ~ "Saved Shot",
@@ -237,26 +219,28 @@ shots_df <- raw_match_df %>%
            shotType == "RightFoot" ~ "Right Foot",
            shotType == "OtherBodyPart" ~ "Other",
            TRUE ~ shotType)) %>% 
-  ## create single team_name column based on home or away
+  ## 5. Consolidate team name into a single column "team_name" based on the "h_a" column.
   mutate(team_name = case_when(
     h_a == "h" ~ h_team,
     h_a == "a" ~ a_team)) %>% 
-  ## add colors to teams
+  ## 6. Add team colors to the row depending on the team.
   mutate(team_color = if_else(team_name == h_team, home_color, away_color)) %>% 
-  ## swap over own goals to the other team
+  ## 7. Own Goal is set to the team that conceded it so swap it to the team that actually scored from it.
   mutate(team_name = case_when(
     result == "Own Goal" & team_name == home_team ~ away_team,
     result == "Own Goal" & team_name == away_team ~ home_team,
     TRUE ~ team_name)) %>% 
+  ## 8. Set "team_name" as a factor variable.
   mutate(team_name = forcats::as_factor(team_name)) %>% 
-  ## make sure that shots are in order
+  ## 9. Arrange the rows by `id` so that shots are in chronological order.
   arrange(id) %>% 
+  ## 10. Separate "player" into two, then re-combine.
   separate(player, into = c("firstname", "player"), 
            sep = "\\s", extra = "merge") %>% 
   ## players like Fabinho are listed without a last name "Tavares"
   ## so just add their name in again if NA
   mutate(player = if_else(is.na(player), firstname, player),
-         ## overwrite ID numbers so they go from 1 to n.
+         ## 11. Set a new cleaner ID for shots so that it starts at 1 and goes to `n`.
          id = row_number())
 
 glimpse(shots_df)
@@ -292,45 +276,40 @@ shots_df <- shots_df %>%
 ## Rolling sum of xG
 
 ```{r}
-## get minute of last shot
+## 1. Get minute of last shot
 last_min <- shots_df$minute %>% unique() %>% last()
 
-## if last shot happened before 90th minute then change to 90
+## 2. If last shot happened before 90th minute then change to 90
 if (last_min < 90) {last_min <- 90}
 
-## index of every minute in match
+## 3. Create index of every minute in the match
 minute <- c(0:last_min)
+
+## 4. Set team names in a list
 team_name <- c(shots_df$h_team %>% unique(),
                shots_df$a_team %>% unique())
 
 rollsum_df <- shots_df %>% 
+  ## 5. Expand shots_df to include rows for every minute
   full_join(crossing(minute, team_name)) %>% 
   arrange(minute) %>% 
   group_by(team_name) %>% 
+  ## 6. Change NAs to 0
+  ## Apply rolling cumulative sum on xG
   mutate(xG = if_else(is.na(xG), 0, xG),
          rollsum = lag(cumsum(xG))) %>% 
   ungroup() %>% 
-  mutate(player_label = case_when(
-    result == "Goal" & situation != "Penalty" ~ paste0(player, ": ", round(xG, digits = 2), " xG"),
-    result == "Goal" & situation == "Penalty" ~ paste0(player, " (Penalty): ", round(xG, digits = 2), " xG"),
-    result == "Own Goal" ~ paste0(player, " (Own Goal): ", round(xG, digits = 2), " xG"),
-    TRUE ~ ""),
-    rollsum_goal = rollsum + xG,
-    minute_goal = minute + 1) %>% 
+  ## 7. Change Player Labels (Not used for the table viz so can be ignored)
+  mutate(rollsum_goal = rollsum + xG) %>% 
   ## for Minute == 0
   mutate(rollsum = if_else(is.na(rollsum), 0, rollsum),
          rollsum_goal = if_else(is.na(rollsum_goal), 0, rollsum_goal)) %>% 
-  ## for Minute 0
-  add_row(team_name = home_team, minute = 0, minute_goal = 0,
-          rollsum = 0, rollsum_goal = 0,
-          xG = 0) %>% 
-  add_row(team_name = away_team, minute = 0, minute_goal = 0,
-          rollsum = 0, rollsum_goal = 0,
-          xG = 0) %>% 
   ## FOR THIS BLOGPOST // GT TABLE WE DON'T NEED MOST OF THESE COLUMNS
   ## We'll only use the shot order ID and the rolling sum of xG that we just calculated.
   filter(xG != 0.00) %>% 
   select(id, rollsum_goal)
+
+glimpse(rollsum_df)
 ```
 
 ## Team Stats (Box score data frame)
@@ -385,7 +364,7 @@ away_stats <- team_stats[2,]
 glimpse(team_stats)
 ```
 
-You can check out more on how to scrape websites responsibly with the {rvest} and {polite} packages in my previous blog post [here]().
+You can check out more on how to scrape websites responsibly with the {rvest} and {polite} packages in my previous blog post [here](https://ryo-n7.github.io/2020-05-14-webscrape-soccer-data-with-R/).
 
 # Data contents
 
@@ -791,15 +770,6 @@ match_gt_xG_timeline <-
       map(match_shots_table_df$complete_plot, ggplot_image, height = px(150), aspect_ratio = 2)
     }
   )
-
-
-# match_gt_xG_timeline %>% 
-#   fmt_number(
-#     columns = vars(xG, rollsum),
-#     n_sigfig = 3,
-#     drop_trailing_zeros = FALSE
-#   ) %>% 
-#   cols_hide(vars(complete_plot))
 ```
 
 ## Rename Columns
