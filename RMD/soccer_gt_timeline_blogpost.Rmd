@@ -12,23 +12,10 @@ knitr::opts_chunk$set(echo = TRUE)
 # Introduction
 
 
-Despite recent advances that have overtaken xG
-
-measuring shot quality instead of simply looking at the lump sum of shots taken (off and on target) by one team compared to the other. 
-
-expected goals as a concept is still the most widely-accepted metric by the general public. 
-
-
-
-For R users who want to dabble I highly recommend the following:
-
-- [Fitting your own football xG model - Dato Futbol](https://www.datofutbol.cl/xg-model/) by [Ismael Gomez](https://twitter.com/DatoFutbol_cl)
-
-- [xG Model - Design and Implementation with R Tidymodels](https://www.thesignificantgame.com/portfolio/expected-goals-model-with-tidymodels/) by [Lars M.](https://twitter.com/thesignigame)
 
 I started out in soccer analytics mainly to practice my data cleaning and visualization skills and over time it evolved into an entire portfolio of plots and graphs that you can see in the [soccer_ggplots Github Repo](https://github.com/Ryo-N7/soccer_ggplots).
 
-At the beginning of last season I figured out how to grab match-level data from [understat.com]() via [Ewen Henderson]()'s [{understatr}]() package and started creating a "matchday summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the general public. 
+At the beginning of last season (summer of 2019) I figured out how to grab match-level data from [understat.com]() via [Ewen Henderson]()'s [{understatr}]() package and started creating a "matchday summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the general public (mainly on soccer analytics Twitter). These weren't intended for coaches/clubs themselves but more media/fan oriented pieces to help convey the flow of the match in a different way than the usual box scores (shots, tackles, yellow cards, total passes, etc.).
 
 Version 1 looked like this:
 
@@ -53,6 +40,9 @@ So here are the new xG summary timelines:
 
 
 ![]()
+
+
+This blog post will **only** go over the {gt} timelines.
 
 
 # Design Choices
@@ -121,15 +111,14 @@ For the average Joe this along with the more recent FBref (advanced metrics prov
 
 It would be a point of interest to create my own xG model based on the variables provided on understat.com by following some of the "how-to" blog posts around the web such as: 
 
-* []()
+- [Fitting your own football xG model - Dato Futbol](https://www.datofutbol.cl/xg-model/) by [Ismael Gomez](https://twitter.com/DatoFutbol_cl)
 
-* []()
-
+- [xG Model - Design and Implementation with R Tidymodels](https://www.thesignificantgame.com/portfolio/expected-goals-model-with-tidymodels/) by [Lars M.](https://twitter.com/thesignigame)
 
 
 # Code Breakdown (Part 1)
 
-We can finally get to the real meat of this blog post which is the code to create all these visualizations. We'll be going through things almost line-by-line and then at the end we'll create a function out of it so it can be applied to other matches/teams as well! 
+We can finally get to the real meat of this blog post which is the code to create the visualization. We'll be going through things almost line-by-line and then at the end we'll create a function out of it so it can be applied to other matches/teams as well! 
 
 Let's get started!
 
@@ -175,6 +164,8 @@ raw_match_df <- understatr::get_match_shots(match_id = match_id)
 
 glimpse(raw_match_df)
 ```
+
+When I was first making these plots (around a year ago) the `understatr::get_match_shots()` function didn't exist so I had my own way of scraping this data. I've kept using my own methods in my personal scripts but for the purposes of this blog post I'll use `understatr::get_match_shots()` for your convenience.
 
 The raw data we get is already in good shape thanks to {understatr} but we still need to do some more. 
 
@@ -878,8 +869,19 @@ We can run the same function for other matches from understat. You can modify th
 # Acknowledgements
 
 
+David    for providing the inspiration and initial #TidyTuesday code example for inserting ggplots into {gt} via the `text_transform()` function. 
+
+
+Rich Iannone for {gt}
+
+The Twitter fam for providing feedback on my stuff. 
+
+
 # Conclusion & Future Steps
 
+
+
+Writing up this blog post also helped me re-___ my code so a good chunk of the stuff you saw above are going to be incorporated into my own scripts in some shape or another in the near future!
 
 
 DARK MODE!
