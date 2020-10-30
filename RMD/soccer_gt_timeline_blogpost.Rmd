@@ -798,7 +798,7 @@ match_gt_xG_timeline <-
 
 ![]()
 
-[link to complete table]() 
+[Link to complete table]() 
 
 
 # Complete function
@@ -1026,9 +1026,9 @@ create_timeline_table <- function(shots_df, rollsum_df, home_stats, away_stats,
 
 
 ```{r eval=FALSE}
-create_timeline_table(shots_df, rollsum_df, home_stats, away_stats,
-                      home_team, away_team, home_color, away_color, 
-                      match_date, league_year, matchday)
+match_gt_xG_timeline <- create_timeline_table(shots_df, rollsum_df, home_stats, away_stats,
+                                              home_team, away_team, home_color, away_color, 
+                                              match_date, league_year, matchday)
 ```
 
 # Save online to RPubs
@@ -1036,10 +1036,10 @@ create_timeline_table(shots_df, rollsum_df, home_stats, away_stats,
 Taking the first three letters of the home and away team via `str_sub()` and then pasting them in to the file name with `glue()` we can save our table with the `gtsave()` function with a uniform naming style. If you want to save tables for an entire team's matches in a season I recommend you put the Match Day number or some other identifier first so you can sort it nicely in a folder.
 
 ```{r eval=FALSE}
-hom <- home_stats$TEAMS %>% str_sub(., 1, 3)
-awa <- away_stats$TEAMS %>% str_sub(., 1, 3)
+hom <- str_sub(home_stats$TEAMS, 1, 3)
+awa <- str_sub(away_stats$TEAMS, 1, 3)
 
-## Save the table in the RMD/output folder in your directory:
+## Save the table in the RMD/output folder in your directory or whatever path you prefer:
 gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap14.html")))
 ```
 
