@@ -101,7 +101,7 @@ Let's get started!
 
 ## Defining Variables
 
-The variables defined below will be used throughout the code and are usually appended to the data frames we'll be creating and cleaning. They'll also be used as arguments for a function we'll create that takes in all the code that'll be described throughout this blog post. 
+The variables defined below will be used throughout the code and some are appended to the data frames we'll be creating and cleaning. They'll also be used as arguments for a function we'll create that takes in all the code that'll be described throughout this blog post. 
 
 Make sure that the "home_team" and "away_team" variables are the exact names for the teams on understat.com but without the `_` symbols (e.g. "West_Ham" should be "West Ham", "Borussia_M.Gladbach" should be "Borussia M.Gladbach"). The underscores will be converted throughout the code so don't worry about them. You have to be careful as some teams on understat.com are labeled with their full name ("West_Bromwich_Albion", "Parma_Calcio_1913") while some other ones aren't ("Tottenham", "Brighton", "Leeds").
 
@@ -113,7 +113,7 @@ The team color is your choice but the table will be using **white** text so be s
 
 * [Team Colours App - FC Python](https://teamcolours.netlify.app/)
 
-Finally you can set the match date to show in the table title here in whatever format you wish. You can actually scrape this via {understatr} as well but I didn't want to bother reformatting with {lubridate} so I just set it manually here.
+Finally you can set the match date, league, season, match day, and source text to show in the table in whatever format you wish. You can actually scrape the "match_date" via {understatr} as well but I didn't want to bother reformatting with {lubridate} so I just set it manually here.
 
 ```{r}
 home_team = "Liverpool"
@@ -123,6 +123,7 @@ away_color = "#1D428A"
 match_date <- "Sep. 12, 2020"
 league_year <- "Premier League 2020-2021"
 matchday <- 1
+source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat"
 ```
 
 ## {understatr} Package
@@ -216,9 +217,9 @@ shots_df <- raw_match_df %>%
 glimpse(shots_df)
 ```
 
-You have to adjust xG for a single sequence of possession so I regularly use the code in [Joe Gallagher](@joedgallagher)'s [blog post](https://jogall.github.io/2019-01-16-adjusted-xG/) for adjusting them whenever there's a sequence with a rebound. 
+You have to adjust xG for a single sequence of possession so I regularly use the code in [Joe Gallagher](https://twitter.com/joedgallagher)'s [blog post](https://jogall.github.io/2019-01-16-adjusted-xG/) for adjusting them whenever there's a sequence with a rebound. 
 
-The xG totals (Liverpool `3.15 xG` vs. Leeds United `0.27 xG`) you see on understats' match pages are using the __ADJUSTED__ values __BUT__ the xG values you see on their shot maps (when you hover over them with your mouse) are the __RAW__ values which are the same ones downloaded via {understatr} (and my own bespoke functions too). So do be careful when you're taking shot data from the website. 99% of the time this discrepancy has been solved by applying the below code from Joe's blog post to rebound shots and other shots in that possession sequence. Understat could be doing something else under the hood but from my experience this usually matches the values up.
+The xG totals (Liverpool `3.15 xG` vs. Leeds United `0.27 xG`) you see on understats' match pages are using the __ADJUSTED__ values __BUT__ the xG values you see on their shot maps (when you hover over them with your mouse) are the __RAW__ values which are same as the ones downloaded via {understatr}. So do be careful when you're taking shot data from the website. 99% of the time this discrepancy has been solved by applying the below code from Joe's blog post to rebound shots and other shots in that possession sequence. Understat could be doing something else under the hood but from my experience this usually matches the values up.
 
 ```{r}
 shots_df %>% filter(team_name == "Liverpool") -> lfc_xg
@@ -232,7 +233,7 @@ lfc_adj <- lfc_xg %>%
 glimpse(lfc_adj)
 ```
 
-Then we just overwrite the raw xG values in `shots_df`.
+Then we just overwrite the raw xG values with the adjusted values into `shots_df`.
 
 ```{r}
 shots_df <- shots_df %>% 
@@ -790,7 +791,7 @@ match_gt_xG_timeline <-
     data_row.padding = px(15),
     source_notes.font.size = 20
   ) %>% 
-  tab_source_note(source_note = md("**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat")) %>% 
+  tab_source_note(source_note = md(source_text)) %>% 
   cols_hide(vars(complete_plot, xG))
 ```
 
@@ -812,10 +813,14 @@ away_color = "#1D428A"
 match_date <- "Sep. 12, 2020"
 league_year <- "Premier League 2020-2021"
 matchday <- 1
+source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat"
 
+## shots_df, rollsum_df, home_stats, away_stats are all created in Part 1!
 
 create_timeline_table <- function(shots_df, rollsum_df, home_stats, away_stats,
-                                  home_team, away_team, home_color, away_color, match_date, league_year, matchday) {
+                                  home_team, away_team, home_color, away_color, 
+                                  match_date, league_year, matchday,
+                                  source_text) {
   
   pitch_custom <- list(
     length = 587,
@@ -1012,7 +1017,7 @@ create_timeline_table <- function(shots_df, rollsum_df, home_stats, away_stats,
       data_row.padding = px(15),
       source_notes.font.size = 20
     ) %>% 
-    tab_source_note(source_note = md("**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat")) %>% 
+    tab_source_note(source_note = md(source_text)) %>% 
     cols_hide(vars(complete_plot, xG))
   
   return(match_gt_xG_timeline)
@@ -1021,11 +1026,12 @@ create_timeline_table <- function(shots_df, rollsum_df, home_stats, away_stats,
 
 
 ```{r eval=FALSE}
-create_timeline_table()
+create_timeline_table(shots_df, rollsum_df, home_stats, away_stats,
+                      home_team, away_team, home_color, away_color, 
+                      match_date, league_year, matchday)
 ```
 
-
-## Save online to RPubs
+# Save online to RPubs
 
 Taking the first three letters of the home and away team via `str_sub()` and then pasting them in to the file name with `glue()` we can save our table with the `gtsave()` function with a uniform naming style. If you want to save tables for an entire team's matches in a season I recommend you put the Match Day number or some other identifier first so you can sort it nicely in a folder.
 
@@ -1047,9 +1053,35 @@ markdown::rpubsUpload(title = "gt-test5.html", htmlFile = here::here("RMD/output
 
 We can run the same function for other matches from understat. You can modify the inputs/code a bit and use your own data or other data sources as well. 
 
+```{r}
+match_id <- 14836
+home_team = "Barcelona"
+away_team = "Real Madrid"
+home_color = "#a50044" 
+away_color = "#000000"
+match_date <- "Oct. 24, 2020"
+league_year <- "La Liga 2020-2021"
+matchday <- 5
+source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat"
+```
+
 ![]()
 
 [Code link]()
+
+
+```{r}
+match_id <- 14126
+home_team = "Inter"
+away_team = "Fiorentina"
+home_color = "#0068A8" 
+away_color = "#5526b9"
+match_date <- "Sep. 26, 2020"
+league_year <- "Serie A 2020-2021"
+matchday <- 1
+source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat"
+```
+
 
 ![]()
 
@@ -1058,13 +1090,13 @@ We can run the same function for other matches from understat. You can modify th
 
 # Acknowledgements
 
+* [David Smale](https://twitter.com/committedtotape) for providing the inspiration and initial #TidyTuesday code example for inserting ggplots into {gt} via the `text_transform()` function. 
 
-David    for providing the inspiration and initial #TidyTuesday code example for inserting ggplots into {gt} via the `text_transform()` function. 
+* [Rich Iannone](https://twitter.com/riannone) for {gt}
 
+* [Joe Gallagher](https://twitter.com/joedgallagher) for the R code for adjusting xG per possession sequence.
 
-Rich Iannone for {gt}
-
-The Twitter fam for providing feedback on my stuff. 
+* Twitter friends (#rstats & football analytics Twitter) for providing feedback on my stuff. 
 
 
 # Conclusion & Future Steps
