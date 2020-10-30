@@ -21,8 +21,6 @@ pacman::p_load(dplyr, tidyr, stringr, stringi, purrr,
                understatr, ggsoccer)
 ## Load fonts
 loadfonts(quiet = TRUE)
-
-sessionInfo()
 ```
 
 
@@ -30,7 +28,8 @@ sessionInfo()
 
 ```{r}
 create_timeline_table <- function(shots_df, rollsum_df, home_stats, away_stats,
-                                  home_team, away_team, home_color, away_color, 
+                                  home_team, away_team, home_color, away_color,
+                                  home_team_logo, away_team_logo,
                                   match_date, league_year, matchday,
                                   source_text) {
   
@@ -150,7 +149,7 @@ create_timeline_table <- function(shots_df, rollsum_df, home_stats, away_stats,
   match_gt_xG_timeline <- 
     gt(match_shots_table_df) %>% 
     tab_header(   
-      title = gt::html(glue::glue("<p><img src='https://i.imgur.com/RlXYW46.png' alt='LFC' style='float:left;height:190px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_stats$home_team_color}; font-size:55px'>{home_stats$TEAMS}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_stats$away_team_color}; font-size:55px'>{away_stats$TEAMS}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='https://i.imgur.com/r6Y9lT8.png' alt='LUFC' style='float:right;height:190px;'> 
+      title = gt::html(glue::glue("<p><img src='{home_team_logo}' alt='home_team_logo' style='float:left;height:190px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_stats$home_team_color}; font-size:55px'>{home_stats$TEAMS}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_stats$away_team_color}; font-size:55px'>{away_stats$TEAMS}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='{away_team_logo}' alt='away_team_logo' style='float:right;height:190px;'> 
 </p><span style='font-size:40px'>{league_year}: Matchday {matchday} ({match_date})</span>"))) %>% 
     ## title style
     tab_style(
@@ -229,12 +228,257 @@ create_timeline_table <- function(shots_df, rollsum_df, home_stats, away_stats,
       data_row.padding = px(15),
       source_notes.font.size = 20
     ) %>% 
-    tab_source_note(source_note = md(source_text) %>% 
+    tab_source_note(source_note = md(source_text)) %>% 
     cols_hide(vars(complete_plot, xG))
   
   return(match_gt_xG_timeline)
 }
 ```
+
+
+
+
+
+# Liverpool vs. Leeds United
+
+```{r}
+home_team = "Liverpool"
+away_team = "Leeds"
+home_color = "#d00027" 
+away_color = "#1D428A"
+home_team_logo <- "https://i.imgur.com/RlXYW46.png"
+away_team_logo <- "https://i.imgur.com/r6Y9lT8.png"
+match_date <- "Sep. 12, 2020"
+league_year <- "Premier League 2020-2021"
+matchday <- 1
+source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat"
+```
+
+```{r}
+match_id <- 14090
+raw_match_df <- understatr::get_match_shots(match_id = match_id)
+
+glimpse(raw_match_df)
+```
+
+
+```{r}
+shots_df <- raw_match_df %>% 
+  ## 1. Take out 2 columns we don't really need.
+  select(-h_goals, -a_goals) %>% 
+  ## 2. Make sure the selected columns are set to numeric type.
+  mutate(across(c(minute, xG, X, Y, 
+                 player_id, match_id, season), as.numeric)) %>% 
+  ## 3. If xG is `NA` then set it to 0.
+  ## 4. Relabel the categories in "result", "situation", "lastAction", and "shotType" columns so they're more human-friendly and presentable.
+  mutate(xG = if_else(is.na(xG), 0, xG),
+         result = case_when(
+           result == "SavedShot" ~ "Saved Shot",
+           result == "BlockedShot" ~ "Blocked Shot",
+           result == "MissedShots" ~ "Missed Shot",
+           result == "ShotOnPost" ~ "On Post",
+           result == "OwnGoal" ~ "Own Goal",
+           TRUE ~ result),
+         situation = case_when(
+           situation == "OpenPlay" ~ "Open Play", 
+           situation == "FromCorner" ~ "From Corner",
+           situation == "DirectFreekick" ~ "From Free Kick",
+           situation == "SetPiece" ~ "Set Piece",
+           TRUE ~ situation),
+         lastAction = case_when(
+           lastAction == "BallRecovery" ~ "Ball Recovery",
+           lastAction == "BallTouch" ~ "Ball Touch",
+           lastAction == "LayOff" ~ "Lay Off",
+           lastAction == "TakeOn" ~ "Take On",
+           lastAction == "Standard" ~ NA_character_,
+           lastAction == "HeadPass" ~ "Headed Pass",
+           lastAction == "BlockedPass" ~ "Blocked Pass",
+           lastAction == "OffsidePass" ~ "Offside Pass",
+           lastAction == "CornerAwarded" ~ "Corner Awarded",
+           lastAction == "Throughball" ~ "Through ball",
+           lastAction == "SubstitutionOn" ~ "Subbed On",
+           TRUE ~ lastAction),
+         shotType = case_when(
+           shotType == "LeftFoot" ~ "Left Foot",
+           shotType == "RightFoot" ~ "Right Foot",
+           shotType == "OtherBodyPart" ~ "Other",
+           TRUE ~ shotType)) %>% 
+  ## 5. Consolidate team name into a single column "team_name" based on the "h_a" column.
+  mutate(team_name = case_when(
+    h_a == "h" ~ h_team,
+    h_a == "a" ~ a_team)) %>% 
+  ## 6. Add team colors to the row depending on the team.
+  mutate(team_color = if_else(team_name == h_team, home_color, away_color)) %>% 
+  ## 7. Own Goal is set to the team that conceded it so swap it to the team that actually scored from it.
+  mutate(team_name = case_when(
+    result == "Own Goal" & team_name == home_team ~ away_team,
+    result == "Own Goal" & team_name == away_team ~ home_team,
+    TRUE ~ team_name)) %>% 
+  ## 8. Set "team_name" as a factor variable.
+  mutate(team_name = forcats::as_factor(team_name)) %>% 
+  ## 9. Arrange the rows by `id` so that shots are in chronological order.
+  arrange(id) %>% 
+  ## 10. Separate "player" into two, then re-combine.
+  separate(player, into = c("firstname", "player"), 
+           sep = "\\s", extra = "merge") %>% 
+  ## players like Fabinho are listed without a last name "Tavares"
+  ## so just add their name in again if NA
+  mutate(player = if_else(is.na(player), firstname, player),
+         ## 11. Set a new cleaner ID for shots so that it starts at 1 and goes to `n`.
+         id = row_number())
+
+glimpse(shots_df)
+```
+
+```{r}
+shots_df %>% filter(team_name == "Liverpool") -> lfc_xg
+
+lfc_adj <- lfc_xg %>% 
+  filter(minute == 39) %>%
+  mutate(xg_total = (1 - prod(1 - xG))) %>%
+  mutate(xg_adj = xg_total * (xG / sum(xG))) %>% 
+  select(minute, xG, xg_adj, player, situation, lastAction)
+
+glimpse(lfc_adj)
+```
+
+```{r}
+shots_df <- shots_df %>% 
+  mutate(xG = case_when(
+    minute == 39 & id == 10 ~ 0.10171848,
+    minute == 39 & id == 11 ~ 0.08383471,
+    TRUE ~ xG))
+```
+
+```{r}
+## 1. Get minute of last shot
+last_min <- shots_df$minute %>% unique() %>% last()
+
+## 2. If last shot happened before 90th minute then change to 90
+if (last_min < 90) {last_min <- 90}
+
+## 3. Create index of every minute in the match
+minute <- c(0:last_min)
+
+## 4. Set team names in a list
+team_name <- c(shots_df$h_team %>% unique(),
+               shots_df$a_team %>% unique())
+
+rollsum_df <- shots_df %>% 
+  ## 5. Expand shots_df to include rows for every minute
+  full_join(crossing(minute, team_name)) %>% 
+  arrange(minute) %>% 
+  group_by(team_name) %>% 
+  ## 6. Change NAs to 0
+  ## Apply rolling cumulative sum on xG
+  mutate(xG = if_else(is.na(xG), 0, xG),
+         rollsum = lag(cumsum(xG))) %>% 
+  ungroup() %>% 
+  ## 7. Change Player Labels (Not used for the table viz so can be ignored)
+  mutate(rollsum_goal = rollsum + xG) %>% 
+  ## for Minute == 0
+  mutate(rollsum = if_else(is.na(rollsum), 0, rollsum),
+         rollsum_goal = if_else(is.na(rollsum_goal), 0, rollsum_goal)) %>% 
+  ## FOR THIS BLOGPOST // GT TABLE WE DON'T NEED MOST OF THESE COLUMNS
+  ## We'll only use the shot order ID and the rolling sum of xG that we just calculated.
+  filter(xG != 0.00) %>% 
+  select(id, rollsum_goal)
+
+glimpse(rollsum_df)
+```
+
+
+```{r}
+match_url <- stringr::str_glue("https://understat.com/match/{match_id}")
+
+match_page <- polite::bow(match_url)
+
+team_stats_raw <- polite::scrape(match_page) %>% 
+  html_nodes("div.scheme-block:nth-child(4)") %>% 
+  html_text() %>% 
+  str_remove_all(., "CHANCES") %>% 
+  str_remove_all(., "([0-9]{2,}%)") %>% 
+  str_replace_all(., "SHOTS ON TARGET", "ON-TARGET") %>% 
+  str_squish()
+
+## make sure that you set "home_team" and "away_team" in the beginning as they are on understat.com
+if (str_detect(home_team, " ") == TRUE | 
+    str_detect(away_team, " ") == TRUE) {
+  
+  home_team_sp <- str_replace_all(home_team, " ", "-")
+  away_team_sp <- str_replace_all(away_team, " ", "-")
+  
+  team_stats_raw <- team_stats_raw %>% 
+    str_replace_all(., home_team, home_team_sp) %>% 
+    str_replace_all(., away_team, away_team_sp)
+}
+
+home_team_sp <- str_replace_all(home_team, " ", "-")
+away_team_sp <- str_replace_all(away_team, " ", "-")
+
+team_stats <- team_stats_raw %>% 
+  read.table(text = ., header = FALSE, sep = " ",
+             col.names = c("var_name", "home", "away")) %>% 
+  t() %>% 
+  tibble::as_tibble(.name_repair = "minimal") %>% 
+  janitor::row_to_names(row_number = 1) %>% 
+  mutate_at(vars(-TEAMS), ~ as.numeric(.)) %>% 
+  mutate(TEAMS = case_when(
+    str_detect(TEAMS, home_team_sp) ~ home_team,
+    str_detect(TEAMS, away_team_sp) ~ away_team,
+    TRUE ~ TEAMS
+  ))
+
+## split team stats into "home" and "away"
+home_stats <- team_stats[1,]
+
+away_stats <- team_stats[2,]
+
+## add colors based on defined variables for team's respective color
+home_stats$home_team_color <- home_color
+away_stats$away_team_color <- away_color
+
+glimpse(team_stats)
+```
+
+
+
+```{r}
+home_team = "Liverpool"
+away_team = "Leeds"
+home_color = "#d00027" 
+away_color = "#1D428A"
+home_team_logo <- "https://i.imgur.com/RlXYW46.png"
+away_team_logo <- "https://i.imgur.com/r6Y9lT8.png"
+match_date <- "Sep. 12, 2020"
+league_year <- "Premier League 2020-2021"
+matchday <- 1
+source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat"
+```
+
+```{r}
+match_gt_xG_timeline <- create_timeline_table(shots_df, rollsum_df, home_stats, away_stats,
+                      home_team, away_team, home_color, away_color, 
+                      home_team_logo, away_team_logo,
+                      match_date, league_year, matchday,
+                      source_text)
+```
+
+
+```{r}
+hom <- str_sub(home_stats$TEAMS, 1, 3)
+awa <- str_sub(away_stats$TEAMS, 1, 3)
+
+## Save the table in the RMD/output folder in your directory or whatever path you prefer:
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap.html")))
+```
+
+```{r}
+markdown::rpubsUpload(title = glue::glue("gt-{hom}{awa}_match_gt_shotmap.html"), 
+                      htmlFile = here::here("RMD/output/{hom}{awa}_match_gt_shotmap.html"))
+```
+
+
 
 
 
@@ -245,6 +489,8 @@ home_team = "Barcelona"
 away_team = "Real Madrid"
 home_color = "#a50044" 
 away_color = "#000000"
+home_team_logo <- "https://i.imgur.com/aITUPeB.png"
+away_team_logo <- "https://i.imgur.com/OJ32tVY.png"
 match_date <- "Oct. 24, 2020"
 league_year <- "La Liga 2020-2021"
 matchday <- 5
@@ -327,6 +573,29 @@ shots_df <- raw_match_df %>%
 glimpse(shots_df)
 ```
 
+```{r}
+shots_df %>% filter(team_name == "Real Madrid") -> lfc_xg
+
+lfc_adj <- lfc_xg %>% 
+  filter(minute == 85 & player == "Kroos") %>%
+  mutate(xg_total = (1 - prod(1 - xG))) %>%
+  mutate(xg_adj = xg_total * (xG / sum(xG))) %>% 
+  select(minute, id, xG, xg_adj, player, situation, lastAction)
+
+lfc_adj2 <- lfc_xg %>% 
+  filter(minute == 85 & player != "Kroos") %>%
+  mutate(xg_total = (1 - prod(1 - xG))) %>%
+  mutate(xg_adj = xg_total * (xG / sum(xG))) %>% 
+  select(minute, id, xG, xg_adj, player, situation, lastAction)
+
+shots_df <- shots_df %>% 
+  mutate(xG = case_when(
+    minute == 85 & id == 20 ~ 0.09467416,
+    minute == 85 & id == 21 ~ 0.36911286,
+    minute == 85 & id == 22 ~ 0.18345433,
+    minute == 85 & id == 23 ~ 0.04460676,
+    TRUE ~ xG))
+```
 
 
 ```{r}
@@ -420,13 +689,15 @@ away_stats$away_team_color <- away_color
 glimpse(team_stats)
 ```
 
-
+## run function
 
 ```{r}
 home_team = "Barcelona"
 away_team = "Real Madrid"
 home_color = "#a50044" 
 away_color = "#000000"
+home_team_logo <- "https://i.imgur.com/aITUPeB.png"
+away_team_logo <- "https://i.imgur.com/OJ32tVY.png"
 match_date <- "Oct. 24, 2020"
 league_year <- "La Liga 2020-2021"
 matchday <- 5
@@ -434,16 +705,27 @@ source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: u
 ```
 
 ```{r}
-create_timeline_table(shots_df, rollsum_df, home_stats, away_stats,
-                      home_team, away_team, home_color, away_color, 
-                      match_date, league_year, matchday,
-                      source_text)
+match_gt_xG_timeline <- create_timeline_table(shots_df, rollsum_df, 
+                                              home_stats, away_stats,
+                                              home_team, away_team, home_color, away_color, 
+                                              home_team_logo, away_team_logo,
+                                              match_date, league_year, matchday,
+                                              source_text)
 ```
 
 
+```{r}
+hom <- str_sub(home_stats$TEAMS, 1, 3)
+awa <- str_sub(away_stats$TEAMS, 1, 3)
 
+## Save the table in the RMD/output folder in your directory or whatever path you prefer:
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap.html")))
+```
 
-
+```{r}
+markdown::rpubsUpload(title = glue::glue("gt-{hom}{awa}_match_gt_shotmap.html"), 
+                      htmlFile = here::here("RMD/output/{hom}{awa}_match_gt_shotmap.html"))
+```
 
 
 # Inter Milan vs. Fiorentina
@@ -454,6 +736,8 @@ home_team = "Inter"
 away_team = "Fiorentina"
 home_color = "#0068A8" 
 away_color = "#5526b9"
+home_team_logo <- "https://i.imgur.com/ttrRrzX.png"
+away_team_logo <- "https://i.imgur.com/vxJTyh9.png"
 match_date <- "Sep. 26, 2020"
 league_year <- "Serie A 2020-2021"
 matchday <- 1
@@ -630,7 +914,7 @@ away_stats$away_team_color <- away_color
 glimpse(team_stats)
 ```
 
-
+## run function
 
 ```{r}
 match_id <- 14126
@@ -638,6 +922,8 @@ home_team = "Inter"
 away_team = "Fiorentina"
 home_color = "#0068A8" 
 away_color = "#5526b9"
+home_team_logo <- "https://i.imgur.com/ttrRrzX.png"
+away_team_logo <- "https://i.imgur.com/vxJTyh9.png"
 match_date <- "Sep. 26, 2020"
 league_year <- "Serie A 2020-2021"
 matchday <- 1
@@ -645,14 +931,26 @@ source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: u
 ```
 
 ```{r}
-create_timeline_table(shots_df, rollsum_df, home_stats, away_stats,
+match_gt_xG_timeline <- create_timeline_table(shots_df, rollsum_df, home_stats, away_stats,
                       home_team, away_team, home_color, away_color, 
+                      home_team_logo, away_team_logo,
                       match_date, league_year, matchday,
                       source_text)
 ```
 
 
+```{r}
+hom <- str_sub(home_stats$TEAMS, 1, 3)
+awa <- str_sub(away_stats$TEAMS, 1, 3)
 
+## Save the table in the RMD/output folder in your directory or whatever path you prefer:
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap.html")))
+```
+
+```{r}
+markdown::rpubsUpload(title = glue::glue("gt-{hom}{awa}_match_gt_shotmap.html"), 
+                      htmlFile = here::here(glue::glue("RMD/output/{hom}{awa}_match_gt_shotmap.html")))
+```
 
 
 

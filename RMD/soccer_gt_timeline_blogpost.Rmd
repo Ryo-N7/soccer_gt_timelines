@@ -17,7 +17,7 @@ In this blog post I'll be talking about my submission to the 2020 RStudio Table 
 
 I started out in soccer analytics mainly to practice my data cleaning and visualization skills and over time it evolved into an entire portfolio of plots and graphs that you can see in the [soccer_ggplots Github Repo](https://github.com/Ryo-N7/soccer_ggplots).
 
-At the beginning of last season (summer of 2019) I figured out how to grab match-level data from [understat.com]() via [Ewen Henderson]()'s [{understatr}]() package and started creating a "matchday summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the __general public__ (mainly on soccer analytics Twitter). These weren't intended for __coaches/clubs__ themselves but more __media/fan oriented__ pieces to help convey the flow of the match in a different way than the usual box scores (number of shots, tackles, yellow cards, total passes, etc.).
+At the beginning of last season (summer of 2019) I figured out how to grab match-level data from [understat.com](https://understat.com/) via [Ewen Henderson](https://twitter.com/ewen_/)'s [{understatr}](https://github.com/ewenme/understatr) package and started creating a "matchday summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the __general public__ (mainly on soccer analytics Twitter). These weren't intended for __coaches/clubs__ themselves but more __media/fan oriented__ pieces to help convey the flow of the match in a different way than the usual box scores (number of shots, tackles, yellow cards, total passes, etc.).
 
 Version 1 looked like this:
 
@@ -25,8 +25,7 @@ Version 1 looked like this:
 
 In the past few months after the Corona extended season ended I intended to make tweaks to the graph above but instead I just started creating other viz with the data available while also incorporating some other stuff that I couldn't fit into the original match day viz. 
 
-![look-over-meme]()
-"Tweak and improve existing data viz." <> "Create new viz from scratch."
+![look-over-meme](https://i.imgur.com/CmqYwiX.jpg)
 
 One of the new viz I created was a chronological table of shots during the course of the match which provides the viewer with a lot more detail about any single shot. Besides the xG value, things like the "situation" (open play? free kick? etc.), "shot type" (right, left, header), etc. were added for more context. In general I wanted the next series of viz to add a bit more context to the overall xG flow during the match and the shot maps. 
 
@@ -82,7 +81,7 @@ sessionInfo()
 
 # Data Source
 
-Data source: [understat.com]()
+Data source: [understat.com](https://understat.com/)
 
 Definitions for some variables are provided by hovering over column names on the website. Others are opaque but follow similar terminology set by other data companies and websites. For the average Joe understat.com along with the more recent FBref (with advanced metrics provided by StatsBomb) are the best free and publicly available websites for obtaining this kind of data that I know of. 
 
@@ -93,7 +92,7 @@ The biggest concern with using the data is that I'm not in control over the calc
 - [xG Model - Design and Implementation with R Tidymodels](https://www.thesignificantgame.com/portfolio/expected-goals-model-with-tidymodels/) by [Lars M.](https://twitter.com/thesignigame)
 
 
-# Code Breakdown (Part 1)
+# Code Breakdown (Part 1): Initial Data Gathering & Cleaning!
 
 We can finally get to the real meat of this blog post which is the code to create the visualization. We'll be going through things almost line-by-line and then at the end we'll create a function out of it so it can be applied to other matches/teams as well! 
 
@@ -120,6 +119,10 @@ home_team = "Liverpool"
 away_team = "Leeds"
 home_color = "#d00027" 
 away_color = "#1D428A"
+
+home_team_logo <- "https://i.imgur.com/RlXYW46.png"
+away_team_logo <- "https://i.imgur.com/r6Y9lT8.png"
+
 match_date <- "Sep. 12, 2020"
 league_year <- "Premier League 2020-2021"
 matchday <- 1
@@ -398,7 +401,7 @@ The box score you see in the "Stats" tab of the match page on understat.com. "ho
 glimpse(team_stats)
 ```
 
-# Code Breakdown (Part 2)
+# Code Breakdown (Part 2): Creating the Shot Maps & Cleaning the Data!
 
 ## Creating the soccer field plots
 
@@ -615,7 +618,7 @@ match_shots_table_df <- dfdfdf %>%
 glimpse(match_shots_table_df)
 ```
 
-# Code Breakdown (Part 3)
+# Code Breakdown (Part 3): The {gt} table!
 
 ## Soccer ball emoji
 
@@ -629,26 +632,15 @@ soccer_ball <- "<span style='color:white;font-size:25px'>&#9917;</span>"
 
 To start off, we add in the title and team logo images via HTML. Something very simple as getting the team logo images to be set to the side of the text took a looooonnggg time and many many iterations because I'm not very good at HTML/CSS but it got done eventually... They key ended up playing around with the margins in the `img` tag.
 
-You can define variables in text via `glue::glue()` and declaring variables inside `{}` so it can be customized depending on the match data you're passing in. 
+You can define variables in text via `glue::glue()` and declaring variables inside `{}` so it can be customized depending on the match data you're passing in. For this example `home_stats$xG` will equal to `3.15` for Liverpool's xG but if we were running this for a different match with a different `home_stats` data frame it'll evaluate to a different xG value for the table title text automatically. 
 
 ```{r}
 match_gt_xG_timeline <- 
   gt(match_shots_table_df) %>% 
   tab_header(   
-    title = gt::html(glue::glue("<p><img src='https://i.imgur.com/RlXYW46.png' alt='LFC' style='float:left;height:190px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_stats$home_team_color}; font-size:55px'>{home_stats$TEAMS}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_stats$away_team_color}; font-size:55px'>{away_stats$TEAMS}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='https://i.imgur.com/r6Y9lT8.png' alt='LUFC' style='float:right;height:190px;'> 
+    title = gt::html(glue::glue("<p><img src='{home_team_logo}' alt='home_team_logo' style='float:left;height:190px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_stats$home_team_color}; font-size:55px'>{home_stats$TEAMS}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_stats$away_team_color}; font-size:55px'>{away_stats$TEAMS}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='{away_team_logo}' alt='away_team_logo' style='float:right;height:190px;'> 
 </p><span style='font-size:40px'>{league_year}: Matchday {matchday} ({match_date})</span>")))
 ```
-
-
-
-margin:0px 50px 0px 150px;
-margin:0px 150px 0px 50px;
-
-Image files need to be placed in output folder
-
-![Picture of directory organization]()
-
-
 
 ## Table Text Style
 
@@ -937,8 +929,8 @@ create_timeline_table <- function(shots_df, rollsum_df, home_stats, away_stats,
   
   match_gt_xG_timeline <- 
     gt(match_shots_table_df) %>% 
-    tab_header(   
-      title = gt::html(glue::glue("<p><img src='https://i.imgur.com/RlXYW46.png' alt='LFC' style='float:left;height:190px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_stats$home_team_color}; font-size:55px'>{home_stats$TEAMS}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_stats$away_team_color}; font-size:55px'>{away_stats$TEAMS}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='https://i.imgur.com/r6Y9lT8.png' alt='LUFC' style='float:right;height:190px;'> 
+      tab_header(   
+    title = gt::html(glue::glue("<p><img src='{home_team_logo}' alt='home_team_logo' style='float:left;height:190px;'><span style='font-size:35px'>({home_stats$xG} xG)</span> <b style='color:{home_stats$home_team_color}; font-size:55px'>{home_stats$TEAMS}</b> <span style='font-size:70px'>{home_stats$GOALS} - </span><span style='font-size:70px'>{away_stats$GOALS}</span> <b style='color:{away_stats$away_team_color}; font-size:55px'>{away_stats$TEAMS}</b> <span style='font-size:35px'>({away_stats$xG} xG)</span><img src='{away_team_logo}' alt='away_team_logo' style='float:right;height:190px;'> 
 </p><span style='font-size:40px'>{league_year}: Matchday {matchday} ({match_date})</span>"))) %>% 
     ## title style
     tab_style(
@@ -1049,50 +1041,32 @@ Alternatively you can upload it directly to your RPub account on the web using `
 markdown::rpubsUpload(title = "gt-test5.html", htmlFile = here::here("RMD/output/LivLee_match_gt_shotmap14.html"))
 ```
 
-# Examples
+# Examples (Screenshot, Full Image, & Code)
 
-We can run the same function for other matches from understat. You can modify the inputs/code a bit and use your own data or other data sources as well. 
+We can run the same function for other matches from understat. You can modify the inputs/code a bit and use your own data or other data sources as well. Below is a screen shot, links to both the **full** table image and the code to create examples for other matches. 
 
-```{r}
-match_id <- 14836
-home_team = "Barcelona"
-away_team = "Real Madrid"
-home_color = "#a50044" 
-away_color = "#000000"
-match_date <- "Oct. 24, 2020"
-league_year <- "La Liga 2020-2021"
-matchday <- 5
-source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat"
-```
+## El Clasico: Barcelona vs. Real Madrid
 
-![]()
+![screenshot]()
 
-[Code link]()
+* [Full Image Link](https://rpubs.com/Ryo-N7/barca-realmadrid-gt-table)
+
+* [Code link]()
 
 
-```{r}
-match_id <- 14126
-home_team = "Inter"
-away_team = "Fiorentina"
-home_color = "#0068A8" 
-away_color = "#5526b9"
-match_date <- "Sep. 26, 2020"
-league_year <- "Serie A 2020-2021"
-matchday <- 1
-source_text <- "**Table**: Ryo Nakagawara (**Twitter**: @R_by_Ryo) | **Data**: understat"
-```
+## Inter Milan vs. Fiorentina (Screenshot)
 
+![screenshot]()
 
-![]()
+* [Full Image Link](https://rpubs.com/Ryo-N7/inter-fiorentina-gt-table)
 
-[Code link]()
-
+* [Code link]()
 
 # Acknowledgements
 
 * [David Smale](https://twitter.com/committedtotape) for providing the inspiration and initial #TidyTuesday code example for inserting ggplots into {gt} via the `text_transform()` function. 
 
-* [Rich Iannone](https://twitter.com/riannone) for {gt}
+* [Rich Iannone](https://twitter.com/riannone) for the {gt} package.
 
 * [Joe Gallagher](https://twitter.com/joedgallagher) for the R code for adjusting xG per possession sequence.
 
