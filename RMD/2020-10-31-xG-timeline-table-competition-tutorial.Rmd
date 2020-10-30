@@ -37,7 +37,7 @@ So here are the new xG match summary viz in their entirety (minus the timeline t
 
 ![LiverpoolLeeds3](https://i.imgur.com/Vh5SSIq.png)
 
-This blog post will **only** go over the {gt} timelines.
+This blog post will **only** go over the {gt} time lines.
 
 # Design Choices
 
@@ -1067,11 +1067,11 @@ We can run the same function for other matches from understat. You can modify th
 
 # Acknowledgements
 
-* [David Smale](https://twitter.com/committedtotape) for providing the inspiration and initial #TidyTuesday code example for inserting ggplots into {gt} via the `text_transform()` function. 
-
 * [Rich Iannone](https://twitter.com/riannone) for the {gt} package.
 
 * [Joe Gallagher](https://twitter.com/joedgallagher) for the R code for adjusting xG per possession sequence.
+
+* [David Smale](https://twitter.com/committedtotape) for providing the inspiration and initial #TidyTuesday code example for inserting ggplots into {gt} via the `text_transform()` function.
 
 * Twitter friends (#rstats & football analytics Twitter) for providing feedback on my stuff. 
 
@@ -1079,9 +1079,7 @@ We can run the same function for other matches from understat. You can modify th
 
 # Conclusion & Future Steps
 
+This blog post was a tutorial for how to create xG and shot time lines using data from [understat.com](https://understat.com/). I also described the data source and my design choices along with the code breakdowns. 
 
-
-Writing up this blog post also helped me re-___ my code so a good chunk of the stuff you saw above are going to be incorporated into my own scripts in some shape or another in the near future!
-
-The code here is still very messy as I'm taking out and switching things around from my usual scripts. Also, I've tried to break stuff up quite a bit so I can explain the code better. It can 100% be improved but hopefully I've given you enough to go on and you can chop and change as you see fit!
+Writing up this blog post also helped me re-factor my code, so a good chunk of the stuff you saw above are going to be incorporated into my own scripts in some shape or another in the near future! Admittedly, the code here is still very messy as I'm taking out and switching things around from my usual scripts. Also, I've tried to break stuff up quite a bit so I can explain the code better. It can 100% be improved but hopefully I've given you enough to start experimenting! 
 
