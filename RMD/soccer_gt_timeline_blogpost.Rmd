@@ -11,7 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
+In this blog post I'll be talking about my submission to the 2020 RStudio Table contest.
 
+![]()
 
 I started out in soccer analytics mainly to practice my data cleaning and visualization skills and over time it evolved into an entire portfolio of plots and graphs that you can see in the [soccer_ggplots Github Repo](https://github.com/Ryo-N7/soccer_ggplots).
 
@@ -21,7 +23,7 @@ Version 1 looked like this:
 
 ![]()
 
-In the past few months after the Corona extended season ended I intended to make tweaks to the graph above but instead I just started creating other views with the data available while also incorporating some other stuff that I couldn't fit into the original match day viz. 
+In the past few months after the Corona extended season ended I intended to make tweaks to the graph above but instead I just started creating other viz with the data available while also incorporating some other stuff that I couldn't fit into the original match day viz. 
 
 ![look-over-meme]()
 "Tweak and improve existing data viz." <> "Create new viz from scratch."
@@ -48,34 +50,29 @@ This blog post will **only** go over the {gt} timelines.
 # Design Choices
 
 
-The color-coding of the rows is intended to give you a clear idea of who were dominating shots at any given time period at a glance without even looking too closely at the details. Of course there may be a ton of shots in a small period of time or vice-versa which can skew your perception if you don't look at the "minute" column closely. 
+The color-coding of the rows is intended to give you a clear idea of who were dominating shots at any given time period at a glance without even looking too closely at the details. Of course there may be a ton of shots in a small period of time or vice-versa which can skew your perception if you don't look at the "minute" column closely. Still, I think it's cool that you can look at the table from far away and identify "chunks" of shot dominance.
 
+Most of the plots you see inserted into {gt} or other R tables in general are spark lines so I thought about including them in mine too. However, I realized that the cumulative xG column covers that and the line graph isn't very visible on the table. The chronological nature of the table also means you get a feel for that perspective of the game anyways (e.g. chunks of "red" rows means that team "red" was taking more shots in that time period). So I decided to focus on something that's a lot easier to see at first glance, the main protagonist of the table, the actual shots themselves. The idea was to have all of the shots of that table row's respective team and then highlight the specific shot of that row along with its xG value. 
 
+![]()
 
-Most of the plots you see inserted into {gt} or other R tables in general are spark lines so I though about including them in mine too. 
+For the title headline text I experimented with a few different sizes depending on the content. The actual score being the biggest in size, then the team names, and then the xG totals for either team in the smallest font at the far ends. I'm still not sure how the text alignment (especially vertical) works so I didn't want to try anything too drastic. I'm still not very fond of the fact that the parentheses around the xG values kind of dip below the other letters, especially the larger text. I am also still vacillating between adding a bit more color to either "xG" or the xG values themselves along their respective team colors. 
 
-- sparkline timeline: no, cum xg covers that and can't see plot point easily in graph. also the nature of the chronological setup already means you get that aspect of the game anyways
-better to focus on something that's easier to see at first glance as highlights the main idea of the table >> shost. 
+column text: column headers in slightly grey to differentiate the text from the title. but still not sure how it looks like as part of the whole table... 
 
-bold text
-emphasize GOALS, OWN GOALS 
-add emoji to further highlight (regular version uses a star emoji instead due to HTML-to-PNG conversion issues with the soccer emoji)
-
-title text: Experimented with different sizes . Still not sure how the text alignment (especially vertical) works so I didn't want to try anything too drastic.
 
  focus on **actual** score line then down to **xG**. I have Expected Points (xPoints) in the other graphic but for the stand-alone version of the tables it might be prudent to include them somehow in a later iteration. 
+ 
+ 
+For the text inside the table cells I made sure they were thick bold text as it in the version that I used to release with my other match viz they were a lot thinner and harder to read. I tried to place emphasis on rows with goals by switching the text to all-caps and adding the emoji alongside it. I think there could be ways of adding more emphasis by coloring the border of that row or something else. Unfortunately for the PNG version in my regular match summary viz the emoji is a star instead of a soccer ball as the soccer ball emoji doesn't convert well from HTML to PNG.
 
+Some other concerns I have are as follows. The large size of table is a concern as it is not very mobile-friendly or small-screen friendly even on computers. The size could still be tweaked but I'm not really sure about making it any smaller or the shot map will be even less visible to the viewer than it already is. 
 
-Concerns:
+My own inexperience with HTML/CSS to get team logos to slot in on either side of the title text. This was only solved after hours upon hours of failed attempts and honestly took up most of my time creating this viz.
 
-large size of file
+The need to be careful about what colors to use as the main team colors (yellow for example is strictly off-limits). There is potential for a dark theme design to alleviate some of the concerns with using yellow or other brighter colors that don't work well with white bold text.
 
-inexperience with HTML/CSS to get team logos to slot in on either side of the title text which was only solved after hours upon hours of attempts.
-
-necessity to be careful about what colors to use as the main team colors (yellow for example is strictly off-limits). Potential for a dark theme design to alleviate some concerns with using yellow or other brighter colors that don't work well with white text.
-
-hard to scroll, no freeze panels >>> but made sure to order the columns in a way that it's immediately obvious what column is what regardless of how far down you are in the table.
-
+As this is a static visualization there aren't any scrolling elements embedded in the table itself nor are there freeze panels so that the column labels follow you as you go down the table. I did try to alleviate this problem by ordering the columns in a way so that its immediately obvious what the column is showing. An interactive version is the solution for a lot of these problems and it may be worth looking into. 
 
 # Packages
 
@@ -138,6 +135,8 @@ away_team = "Leeds"
 home_color = "#d00027" 
 away_color = "#1D428A"
 match_date <- "Sep. 12, 2020"
+league_year <- "Premier League 2020-2021"
+matchday <- 1
 ```
 
 ## {understatr} Package
