@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 pacman::p_load(dplyr, tidyr, stringr, stringi, purrr,
                tibble, lubridate, glue, rlang, 
                rvest, polite,
-               ggplot2, grid, gridExtra, 
+               ggplot2, 
                gt, forcats, ggtext, extrafont, ggrepel, 
                understatr, ggsoccer)
 ## Load fonts
@@ -441,7 +441,7 @@ away_stats$away_team_color <- away_color
 glimpse(team_stats)
 ```
 
-
+## run function
 
 ```{r}
 home_team = "Liverpool"
