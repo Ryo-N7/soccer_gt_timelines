@@ -1023,6 +1023,11 @@ match_gt_xG_timeline <- create_timeline_table(shots_df, rollsum_df, home_stats, 
                                               match_date, league_year, matchday)
 ```
 
+
+* [Full Image Link](https://rpubs.com/Ryo-N7/lfc-leeds-gt-table)
+
+![]()
+
 # Save online to RPubs
 
 Taking the first three letters of the home and away team via `str_sub()` and then pasting them in to the file name with `glue()` we can save our table with the `gtsave()` function with a uniform naming style. If you want to save tables for an entire team's matches in a season I recommend you put the Match Day number or some other identifier first so you can sort it nicely in a folder.

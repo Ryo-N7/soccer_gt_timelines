@@ -470,12 +470,12 @@ hom <- str_sub(home_stats$TEAMS, 1, 3)
 awa <- str_sub(away_stats$TEAMS, 1, 3)
 
 ## Save the table in the RMD/output folder in your directory or whatever path you prefer:
-gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap.html")))
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap_final.html")))
 ```
 
 ```{r}
 markdown::rpubsUpload(title = glue::glue("gt-{hom}{awa}_match_gt_shotmap.html"), 
-                      htmlFile = here::here("RMD/output/{hom}{awa}_match_gt_shotmap.html"))
+                      htmlFile = here::here(glue::glue("RMD/output/{hom}{awa}_match_gt_shotmap_final.html")))
 ```
 
 
