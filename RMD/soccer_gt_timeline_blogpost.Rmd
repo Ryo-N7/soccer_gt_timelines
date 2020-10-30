@@ -11,37 +11,41 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
-In this blog post I'll be talking about my submission to the 2020 RStudio Table contest: A chronological xG table for soccer/football matches powered by data from understat.com!
+In this blog post I'll be talking about my submission to the 2020 RStudio Table contest: A chronological xG table for soccer/football matches powered by data from [understat.com](https://understat.com/)!
 
-![]()
+<iframe src="../assets/2018-01-12-japan-postwar-economic-recovery_files/textiles_chart.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 
 I started out in soccer analytics mainly to practice my data cleaning and visualization skills and over time it evolved into an entire portfolio of plots and graphs that you can see in the [soccer_ggplots Github Repo](https://github.com/Ryo-N7/soccer_ggplots).
 
-At the beginning of last season (summer of 2019) I figured out how to grab match-level data from [understat.com](https://understat.com/) via [Ewen Henderson](https://twitter.com/ewen_/)'s [{understatr}](https://github.com/ewenme/understatr) package and started creating a "matchday summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the __general public__ (mainly on soccer analytics Twitter). These weren't intended for __coaches/clubs__ themselves but more __media/fan oriented__ pieces to help convey the flow of the match in a different way than the usual box scores (number of shots, tackles, yellow cards, total passes, etc.).
+At the beginning of last season (summer of 2019) I figured out how to grab match-level data from [understat.com](https://understat.com/) via [Ewen Henderson](https://twitter.com/ewen_/)'s [{understatr}](https://github.com/ewenme/understatr) package and started creating a "match day summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the __general public__ (mainly on soccer analytics Twitter). These weren't intended for __coaches/clubs__ themselves but more __media/fan oriented__ pieces to help convey the flow of the match in a different way than the usual box scores (number of shots, tackles, yellow cards, total passes, etc.).
 
 Version 1 looked like this:
 
-![]()
+![](https://i.imgur.com/2NeuOtv.png)
 
-In the past few months after the Corona extended season ended I intended to make tweaks to the graph above but instead I just started creating other viz with the data available while also incorporating some other stuff that I couldn't fit into the original match day viz. 
+In the past few months, after the Corona-extended-season ended, I intended to make tweaks to the graph above but instead I just started creating other viz with the data available while also incorporating some other stuff that I couldn't fit into the original match day viz. 
 
 ![look-over-meme](https://i.imgur.com/CmqYwiX.jpg)
 
-One of the new viz I created was a chronological table of shots during the course of the match which provides the viewer with a lot more detail about any single shot. Besides the xG value, things like the "situation" (open play? free kick? etc.), "shot type" (right, left, header), etc. were added for more context. In general I wanted the next series of viz to add a bit more context to the overall xG flow during the match and the shot maps. 
+One of the new viz I created was a chronological table of shots during the course of the match which provides the viewer with a lot more detail about any individual shot. Besides the xG value, things like the "situation" (open play? free kick? etc.), "shot type" (right, left, header), etc. were added for more context. In general I wanted the next series of viz to add a bit more context to the overall xG flow graph and the shot maps. 
 
 So here are the new xG match summary viz in their entirety: 
 
-![LiverpoolLeeds]()
+![LiverpoolLeeds1](https://i.imgur.com/ncsu64A.png)
 
-![]()
+<iframe src="../assets/2018-01-12-japan-postwar-economic-recovery_files/textiles_chart.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 
-![]()
+![LiverpoolLeeds2]()
 
-This blog post will **only** go over the {gt} timelines.
+![LiverpoolLeeds3]()
+
+This blog post will **only** go over the {gt} time lines.
 
 # Design Choices
 
-The __color-coding__ of the rows is intended to give you a clear idea of who were dominating shots at any given time period at a glance without even looking too closely at the details. Of course there may be a ton of shots in a small period of time or vice-versa which can skew your perception if you don't look at the "minute" column closely. Still, I think it's cool that you can look at the table from far away and identify time "chunks" of shot dominance.
+I mostly make very simple designs in my soccer visualizations and I try not to clutter each individual viz with too much info but rather try to peel them apart and split them up into different component viz. In reality, this table viz is only just one of a series of data viz intended to capture details about a match using [understat.com](https://understat.com/)'s data that I post on Twitter but since this tutorial is for a table viz competition I'll keep my discussion to the table viz only.
+
+The __color-coding__ of the rows is intended to give you a clear idea of who was dominating shots at any given time period at a glance, without even having to look closely at the details. Of course, there may be a ton of shots in a small period of time or vice-versa which can skew your perception if you don't look at the "minute" column closely. Still, I think it's cool that you can look at the table from far away and identify time "chunks" of shot dominance. The previous few sentences only touch on the info about the "quantity" of shots taken. The "quality" of the shots can be gleaned from looking at the shot maps, as well as the cumulative sum of a team's xG as you travel down the table chronologically.
 
 Most of the plots you see inserted into {gt} or other R tables in general are spark lines so I thought about including them in mine too. However, I realized that the cumulative xG column covers that and the line graph isn't very visible on the table. The chronological nature of the table also means you get a feel for that perspective of the game anyways (e.g. chunks of "red" rows means that team "red" was taking more shots in that time period). So I decided to focus on something that's a lot easier to see at first glance, the main protagonist of the table, the actual shots themselves. The idea was to have all of the shots of that table row's respective team and then highlight the specific shot of that row along with its xG value. 
 
@@ -49,7 +53,7 @@ Most of the plots you see inserted into {gt} or other R tables in general are sp
 
 For the __title headline text__ I experimented with a few different sizes depending on the content. The actual score being the biggest in size, then the team names, and then the xG totals for either team in the smallest font at the far ends. I'm still not sure how the text alignment (especially vertical) works so I didn't want to try anything too drastic. I'm still not very fond of the fact that the parentheses around the xG values kind of dip below the other letters, especially the larger text. I am also still vacillating between adding a bit more color to either "xG" or the xG values themselves along their respective team colors. I did as I wanted people to focus on **actual** score line first and then down to **xG** values. I have Expected Points (xPoints) in the other match graphics but for the stand-alone version of the tables it might be prudent to include them somehow in a later iteration as well. 
 
-I made the __column header__ color slightly grey to differentiate the text from the title text but I'm still not 100% sure it provides a good balance with the rest of the text in the table. For the text inside the __table cells__ I made sure they were thick bold text as it in the version that I used to release with my other match viz they were a lot thinner and harder to read. I tried to place emphasis on rows with goals by switching the text to all-caps and adding the emoji alongside it. I think there could be ways of adding more emphasis by coloring the border of that row or something else. Unfortunately for the PNG version in my regular match summary viz the emoji is a star instead of a soccer ball as the soccer ball emoji doesn't convert well from HTML to PNG.
+I made the __column header__ color slightly gray to differentiate the text from the title text but I'm still not 100% sure it provides a good balance with the rest of the text in the table. For the text inside the __table cells__ I made sure they were thick bold text as it in the version that I used to release with my other match viz they were a lot thinner and harder to read. I tried to place emphasis on rows with goals by switching the text to all-caps and adding the emoji alongside it. I think there could be ways of adding more emphasis by coloring the border of that row or something else. Unfortunately for the PNG version in my regular match summary viz the emoji is a star instead of a soccer ball as the soccer ball emoji doesn't convert well from HTML to PNG.
 
 Some other concerns I have are as follows. The large size of table is a concern as it is not very mobile-friendly or small-screen friendly even on computers. The size could still be tweaked but I'm not really sure about making it any smaller or the shot map will be even less visible to the viewer than it already is. 
 
@@ -57,7 +61,7 @@ My own inexperience with HTML/CSS to get team logos to slot in on either side of
 
 The need to be careful about what colors to use as the main team colors (yellow for example is strictly off-limits). There is potential for a dark theme design to alleviate some of the concerns with using yellow or other brighter colors that don't work well with white bold text.
 
-As this is a __static visualization__ there aren't any scrolling elements embedded in the table itself nor are there freeze panels so that the column labels follow you as you go down the table. I did try to alleviate this problem by ordering the columns in a way so that its immediately obvious what the column is showing. An interactive version is the solution for a lot of these problems and it may be worth looking into. 
+As this is a __static visualization__ there aren't any scrolling elements embedded in the table itself nor are there freeze panels so that the column labels follow you as you go down the table. I did try to alleviate this problem by ordering the columns in a way so that its immediately obvious what the column is showing. An interactive version is the solution for a lot of these problems and it may be worth looking into in the future. 
 
 # Packages
 
@@ -83,14 +87,13 @@ sessionInfo()
 
 Data source: [understat.com](https://understat.com/)
 
-Definitions for some variables are provided by hovering over column names on the website. Others are opaque but follow similar terminology set by other data companies and websites. For the average Joe understat.com along with the more recent FBref (with advanced metrics provided by StatsBomb) are the best free and publicly available websites for obtaining this kind of data that I know of. 
+Definitions for the variables are provided by hovering over column names on the website. Others are opaque but follow similar terminology set by other data companies and websites. For the average Joe [understat.com](https://understat.com/) along with the more recent [FBref](fbref.com/) (with advanced metrics provided by StatsBomb) are the best free and publicly available websites for obtaining this kind of data that I know of. 
 
-The biggest concern with using the data is that I'm not in control over the calculated outputs. It would be a point of interest to create my own xG model based on the variables provided on understat.com (as well as combining data from other sources) by following some of the "how-to" blog posts around the web such as: 
+The biggest concern with using the data is that I'm not in control over the calculated outputs. It would be a point of interest to create my own xG model based on the variables provided on understat.com (as well as combining data from other sources) by following some of the "how-to" blog posts around the #rstats world such as: 
 
 - [Fitting your own football xG model - Dato Futbol](https://www.datofutbol.cl/xg-model/) by [Ismael Gomez](https://twitter.com/DatoFutbol_cl)
 
 - [xG Model - Design and Implementation with R Tidymodels](https://www.thesignificantgame.com/portfolio/expected-goals-model-with-tidymodels/) by [Lars M.](https://twitter.com/thesignigame)
-
 
 # Code Breakdown (Part 1): Initial Data Gathering & Cleaning!
 
@@ -100,7 +103,7 @@ Let's get started!
 
 ## Defining Variables
 
-The variables defined below will be used throughout the code and some are appended to the data frames we'll be creating and cleaning. They'll also be used as arguments for a function we'll create that takes in all the code that'll be described throughout this blog post. 
+The variables defined below will be used throughout the code and some are appended to the data frames we'll be creating and cleaning. They'll also be used as arguments for a function we'll create that takes in all the code that's be described throughout this blog post. 
 
 Make sure that the "home_team" and "away_team" variables are the exact names for the teams on understat.com but without the `_` symbols (e.g. "West_Ham" should be "West Ham", "Borussia_M.Gladbach" should be "Borussia M.Gladbach"). The underscores will be converted throughout the code so don't worry about them. You have to be careful as some teams on understat.com are labeled with their full name ("West_Bromwich_Albion", "Parma_Calcio_1913") while some other ones aren't ("Tottenham", "Brighton", "Leeds").
 
@@ -249,6 +252,8 @@ shots_df <- shots_df %>%
 
 ## Rolling sum of xG
 
+This data frame calculates the rolling sum of xG values throughout the match. Use the `cumsum()` function to calculate it along the order of shots. This bit of code is actually used for creating the line plot time line viz you saw in the introduction but for the table viz we only need the shot ID and the rolling sum values so that's what we'll `select()` from the data frame.
+
 ```{r}
 ## 1. Get minute of last shot
 last_min <- shots_df$minute %>% unique() %>% last()
@@ -278,7 +283,7 @@ rollsum_df <- shots_df %>%
   ## for Minute == 0
   mutate(rollsum = if_else(is.na(rollsum), 0, rollsum),
          rollsum_goal = if_else(is.na(rollsum_goal), 0, rollsum_goal)) %>% 
-  ## FOR THIS BLOGPOST // GT TABLE WE DON'T NEED MOST OF THESE COLUMNS
+  ## FOR THIS BLOGPOST // {gt} TABLE WE DON'T NEED MOST OF THESE COLUMNS
   ## We'll only use the shot order ID and the rolling sum of xG that we just calculated.
   filter(xG != 0.00) %>% 
   select(id, rollsum_goal)
@@ -303,7 +308,7 @@ team_stats_raw <- polite::scrape(match_page) %>%
   str_replace_all(., "SHOTS ON TARGET", "ON-TARGET") %>% 
   str_squish()
 
-## make sure that you set "home_team" and "away_team" in the beginning as they are on understat.com
+## make sure that you set "home_team" and "away_team" in the beginning, exactly as they appear on understat.com
 if (str_detect(home_team, " ") == TRUE | 
     str_detect(away_team, " ") == TRUE) {
   
@@ -607,8 +612,7 @@ match_shots_table_df <- dfdfdf %>%
   mutate(player_name = paste(firstname, player),
          lastAction = if_else(lastAction == "None", NA_character_, lastAction),
          xG = xG %>% round(digits = 2),
-         rollsum = rollsum %>% round(digits = 2)
-         ) %>% 
+         rollsum = rollsum %>% round(digits = 2)) %>% 
   ## NAs as blanks
   mutate(across(where(is.character), ~ replace_na(., ""))) %>% 
   ## take out extraneous name vars and move to after team name
@@ -787,17 +791,11 @@ match_gt_xG_timeline <-
   cols_hide(vars(complete_plot, xG))
 ```
 
-
-![]()
-
-[Link to complete table]() 
-
-
 # Complete function
 
 We can wrap this all up in a neat function that takes a few useful and flexible arguments so that we can use the code and apply it to other matches. We'll use the inputs we created up to Part 1 as the arguments to pass to the function, the function will contain all the code from __Part 2__ and __Part 3__.
 
-```{r}
+```{r eval=FALSE}
 home_team = "Liverpool"
 away_team = "Leeds"
 home_color = "#d00027" 
@@ -1026,7 +1024,7 @@ match_gt_xG_timeline <- create_timeline_table(shots_df, rollsum_df, home_stats, 
 
 * [Full Image Link](https://rpubs.com/Ryo-N7/lfc-leeds-gt-table)
 
-![]()
+<iframe src="../assets/2018-01-12-japan-postwar-economic-recovery_files/textiles_chart.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 
 # Save online to RPubs
 
@@ -1037,13 +1035,13 @@ hom <- str_sub(home_stats$TEAMS, 1, 3)
 awa <- str_sub(away_stats$TEAMS, 1, 3)
 
 ## Save the table in the RMD/output folder in your directory or whatever path you prefer:
-gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap14.html")))
+gtsave(match_gt_xG_timeline, here::here(glue("RMD/output/{hom}{awa}_match_gt_shotmap.html")))
 ```
 
 Alternatively you can upload it directly to your RPub account on the web using `markdown::rpubsUpload()`. It'll direct you to the RPubs website where you'll be required to log-in or create an account. It's free and its a nice place to host your R web related stuff. Most people use it to host their presentations or analyses notebooks. 
 
 ```{r eval=FALSE}
-markdown::rpubsUpload(title = "gt-test5.html", htmlFile = here::here("RMD/output/LivLee_match_gt_shotmap14.html"))
+markdown::rpubsUpload(title = "gt-test.html", htmlFile = here::here("RMD/output/LivLee_match_gt_shotmap.html"))
 ```
 
 # Examples (Screenshot, Full Image, & Code)
@@ -1052,7 +1050,7 @@ We can run the same function for other matches from understat. You can modify th
 
 ## El Clasico: Barcelona vs. Real Madrid
 
-![screenshot]()
+<iframe src="../assets/2018-01-12-japan-postwar-economic-recovery_files/textiles_chart.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 
 * [Full Image Link](https://rpubs.com/Ryo-N7/barca-realmadrid-gt-table)
 
@@ -1061,7 +1059,7 @@ We can run the same function for other matches from understat. You can modify th
 
 ## Inter Milan vs. Fiorentina (Screenshot)
 
-![screenshot]()
+<iframe src="../assets/2018-01-12-japan-postwar-economic-recovery_files/textiles_chart.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 
 * [Full Image Link](https://rpubs.com/Ryo-N7/inter-fiorentina-gt-table)
 
