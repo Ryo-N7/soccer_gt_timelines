@@ -11,9 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
-In this blog post I'll be talking about my submission to the 2020 RStudio Table contest: A chronological xG table for soccer/football matches powered by data from [understat.com](https://understat.com/)!
+In this blog post I'll be talking about my submission to the 2020 RStudio Table contest: A xG and shots timeline table for soccer/football matches powered by data from [understat.com](https://understat.com/)!
 
-<iframe src="../assets/2020-10-31-xG-timeline-table-competition-tutorial_files/LivLee_match_gt_shotmap_final.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
+<iframe src="../assets/2020-11-02-xG-timeline-table-competition-tutorial_files/LivLee_match_gt_shotmap_final.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 
 I started out in soccer analytics mainly to practice my data cleaning and visualization skills and over time it evolved into an entire portfolio of plots and graphs that you can see in the [soccer_ggplots Github Repo](https://github.com/Ryo-N7/soccer_ggplots). At the beginning of last season (summer of 2019) I figured out how to grab match-level data from [understat.com](https://understat.com/) via [Ewen Henderson](https://twitter.com/ewen_/)'s [{understatr}](https://github.com/ewenme/understatr) package and started creating a "match day summary graphic". These were intended to visualize the data understat.com provided in my own aesthetically-pleasing way for the __general public__ (mainly on soccer analytics Twitter). These aren't intended for __coaches/clubs__ but are more __media/fan oriented__ pieces to help convey the flow of the match in a different way than the usual box scores (number of shots, tackles, yellow cards, total passes, etc.).
 
@@ -39,19 +39,25 @@ This blog post will **only** go over the {gt} time lines.
 
 # Design Choices
 
-I mostly make very simple designs in my soccer visualizations and I try not to clutter each individual viz with too much info, but rather try to peel layers of data apart and split them up into different component viz. In reality, this table viz is only just one of a series of data viz intended to capture details about a match using [understat.com](https://understat.com/)'s data that I post on Twitter but since this tutorial is for a table viz competition I'll keep the following discussion to the table viz only.
+I mostly make very simple designs in my soccer visualizations and I try not to clutter each individual viz with too much info, but rather try to peel layers of data apart and split them up into different component viz (for more examples see [here](https://github.com/Ryo-N7/soccer_ggplots). In reality, this table viz is only just one of a series of data viz intended to capture details about a match using [understat.com](https://understat.com/)'s data that I post on Twitter but since this tutorial is for a table viz competition, I'll keep the following discussion to the table viz only.
 
 The __color-coding__ of the rows is intended to give you a clear idea of who was dominating shots at any given time period at a glance, without even having to look closely at the details. Of course, there may be a ton of shots in a small period of time or vice-versa which can skew your perception if you don't look at the "minute" column closely. Still, I think it's cool that you can look at the table from far away and identify time "chunks" of shot dominance. The previous few sentences only touch on the info about the "quantity" of shots taken. The "quality" of the shots can be gleaned from looking at the shot maps, as well as the cumulative sum of a team's xG as you travel down the table chronologically.
 
-Most of the plots you see inserted into {gt} or other R tables in general are spark lines so I thought about including them in mine too. However, I realized that the cumulative xG column covers that and the line graph wasn't very visible on the table. The chronological nature of the table also means you get a feel for that perspective of the game anyways (e.g. chunks of "red" rows means that team "red" was taking more shots in that time period). In any case the line plot is already covered by another viz in my series so I decided to focus on something that's a lot easier to see at first glance, the main protagonist of the table, the actual shots themselves. The idea was to plot all of the shots of that table row's respective team on a soccer field plot and then highlight the specific shot of that row along with its xG value. 
+Most of the __plots__ you see inserted into {gt} or other R tables in general are spark lines so I thought about including them in mine too. However, I realized that the cumulative xG column covers that and the line graph wasn't very visible on the table. The chronological nature of the table also means you get a feel for that perspective of the game anyways (e.g. chunks of "red" rows means that team "red" was taking more shots in that time period). In any case the line plot is already covered by another viz in my series so I decided to focus on something that's a lot easier to see at first glance, the main protagonist of the table, the actual shots themselves. The idea was to plot all of the shots of that table row's respective team on a soccer field plot and then highlight the specific shot of that row along with its xG value. 
+
+<img src="https://i.imgur.com/ambdYsV.png" style="display: block; margin: auto;" width = "550" />
 
 For the __title headline text__ I experimented with a few different sizes depending on the text content (team name, xG value, score line). The actual score being the biggest in size, then the team names, and then the xG totals for either team in the smallest font at the far ends. I'm still not sure how the text alignment (especially vertical) works so I didn't want to try anything too drastic. I'm still not very fond of the fact that the parentheses around the xG values kind of dip below the other letters, especially the larger text. I am also still vacillating between adding a bit more color to either "xG" or the xG values themselves along their respective team colors. I did all of this as I wanted people to guide people's focus on **actual** score line first and then down across to the **xG** values. I have Expected Points (xPoints) in the other match graphics so for the stand-alone version of the tables it would make sense to include them somehow in a later version as well. 
 
 I made the __column header__ color slightly gray to differentiate the text from the title text but I'm still not 100% sure it provides a good balance with the rest of the text in the table. For the text inside the __table cells__ I made sure they were thick bold text as it in the version that I used to release with my other match viz they were a lot thinner and harder to read. I tried to place emphasis on rows with goals by switching the text to all-caps and adding the emoji alongside it. I think there could be ways of adding more emphasis by coloring the border of that row or something else. Unfortunately, for the PNG version in my regular match summary viz that I post on Twitter, the emoji is a star instead of a soccer ball as the soccer ball emoji doesn't convert well from HTML to PNG. I'll be using the soccer ball emoji here as I'm aiming for an HTML output and don't really care about its ability to be embedded in tweets.
 
+<img src="https://i.imgur.com/FGHkHzt.png" style="display: block; margin: auto;" width = "550" />
+
 Some other concerns I have are as follows. The large size of table is a concern as it is not very mobile-friendly nor small-screen friendly, even on computers. The size could still be tweaked but I'm not really sure about making it any smaller or the shot map will be even less visible than it already is. My own inexperience with HTML/CSS to get team logos to slot in on either side of the title text. This was only solved after hours upon hours of failed attempts and honestly took up most of my time creating this viz. 
 
 There is a need to be careful about what colors to use as the main team colors (yellow for example is strictly off-limits). A dark theme design could potentially be used to alleviate some of the concerns with using yellow or other brighter colors that don't work well with white bold text. Another idea is to use an if-else statement to switch the text to black if the color fill for that row is a certain set of bright colors too.
+
+The team logos are all taken from Wikipedia so the sizes may differ slightly. I may try specifying a specific aspect ratio in the HTML/CSS code but the logos can come in different shapes as well. I also wanted to place the logos slightly inward closer to the text and not exactly in the corners as they are now but setting margins around the logo images caused other problems. 
 
 As this is a __static visualization__ there aren't any scrolling elements embedded in the table itself nor are there freeze panels so that the column labels follow you as you go down the table. I did try to alleviate this problem by ordering the columns in a way so that its immediately obvious what the column is showing. An interactive version is the solution for a lot of these problems and it may be worth looking into in the future. 
 
@@ -61,7 +67,7 @@ THe packages we'll be using are some of the usual tidyverse stalwarts such as {d
 
 We also use the {extrafont} package to make use of some cool fonts for the table/plots, they're loaded in via the `loadfonts()` call. I'll be using the "Roboto Condensed" and "Roboto Slab" fonts that you can download from [Google Fonts](https://fonts.google.com/). Please read the instructions on [extrafont's Github repo](https://github.com/wch/extrafont/) and/or [CRAN docs](https://cran.r-project.org/package=extrafont) for how to install fonts on your computer and use them in R. If you don't want to bother with all that then just delete the code where I specify fonts throughout the blog post.
 
-Also attached is my `sessionInfo()`. YES, YES, I KNOW I HAVE TO UPDATE A LOT OF THINGS.
+Also attached is my `sessionInfo()`.
 
 ```{r}
 # Packages
@@ -219,7 +225,7 @@ glimpse(shots_df)
 
 You have to adjust xG for a single sequence of possession so I regularly use the code in [Joe Gallagher](https://twitter.com/joedgallagher)'s [blog post](https://jogall.github.io/2019-01-16-adjusted-xG/) for adjusting them whenever there's a sequence with a rebound. 
 
-The xG totals (Liverpool `3.15 xG` vs. Leeds United `0.27 xG`) you see on understats' match pages are using the __ADJUSTED__ values __BUT__ the xG values you see on their shot maps (when you hover over them with your mouse) are the __RAW__ values which are same as the ones downloaded via {understatr}. So do be careful when you're taking shot data from the website. 99% of the time this discrepancy has been solved by applying the below code from Joe's blog post to rebound shots and other shots in that possession sequence. Understat could be doing something else under the hood but from my experience this usually matches the values up.
+The xG totals (Liverpool `3.15 xG` vs. Leeds United `0.27 xG`) you see on understats' match pages are using the __ADJUSTED__ values __BUT__ the xG values you see on their shot maps (when you hover over them with your mouse) are the __RAW__ values which are same as the ones downloaded via {understatr}. So do be careful when you're taking shot data from the website. 99% of the time this discrepancy has been solved by applying the below code from Joe's blog post to rebound shots and other shots in that possession sequence. Understat could be doing something else under the hood but from my experience this usually matches the values up. Do note that not all shots that were adjusted by understat for the box score have the "rebound" shot result label which makes it much more difficult to tease out which ones need the adjustment. This is why its important you watch the match or have an easy way of checking every shot/shot sequence.
 
 ```{r}
 shots_df %>% filter(team_name == "Liverpool") -> lfc_xg
@@ -242,7 +248,6 @@ shots_df <- shots_df %>%
     minute == 39 & id == 11 ~ 0.08383471,
     TRUE ~ xG))
 ```
-
 
 ## Rolling sum of xG
 
@@ -763,7 +768,7 @@ match_gt_xG_timeline <-
 
 ## Other Table Options & Source Notes
 
-The `tab_options()` function is a very general function that gives you a lot of options for styles similar to `tab_style()` except without having to bother with specifying the location and such. For our purposes I'm using this to add a thick gray border at the top and bottom of the column headers. This can be done ia `tab_style()` like we did for the "left" and "right" vertical borders but I didn't want to bother with the whole `tab_style()` syntax all over again. You could just add another `tab_style()` function and just specify the "sides" in `cells_borders()` to "top" and "bottom" if you want to do it that way. We make the top and bottom borders of the column labels a bit thicker to separate them from the title and the body of the table by setting the width to be `px(5)` (px stands for pixel).
+The `tab_options()` function is a very general function that gives you a lot of options for styles similar to `tab_style()` except without having to bother with specifying the location and such. For our purposes I'm using this to add a thick gray border at the top and bottom of the column headers. This can be done with `tab_style()` like we did for the "left" and "right" vertical borders but I didn't want to bother with the whole `tab_style()` syntax all over again. You could just add another `tab_style()` function and just specify the "sides" in `cells_borders()` to "top" and "bottom" if you want to do it that way. We make the top and bottom borders of the column labels a bit thicker to separate them from the title and the body of the table by setting the width to be `px(5)` (px stands for pixel).
 
 The "data_row.padding" argument sets the amount of vertical padding to each row of the table while "source_notes.font.size" is fairly self-explanatory. We set the actual text for the source note via the `tab_source_note()` function. Instead of using HTML to style the text, we can use markdown via the `md()` function and style the text using regular markdown syntax. 
 
@@ -1020,9 +1025,9 @@ match_gt_xG_timeline
 
 * [Full Image Link](https://rpubs.com/Ryo-N7/lfc-leeds-gt-table)
 
-<iframe src="../assets/2020-10-31-xG-timeline-table-competition-tutorial_files/LivLee_match_gt_shotmap_final.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
+<iframe src="../assets/2020-11-02-xG-timeline-table-competition-tutorial_files/LivLee_match_gt_shotmap_final.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 
-# Save online to RPubs
+# Save Online to RPubs
 
 Taking the first three letters of the home and away team via `str_sub()` and then pasting them in to the file name with `glue()` we can save our table with the `gtsave()` function with a uniform naming style. If you want to save tables for an entire team's matches in a season I recommend you put the Match Day number or some other identifier first so you can sort it nicely in a folder.
 
@@ -1047,7 +1052,7 @@ We can run the same function for other matches from understat. You can modify th
 
 ## El Clasico: Barcelona vs. Real Madrid
 
-<iframe src="../assets/2020-10-31-xG-timeline-table-competition-tutorial_files/BarRea_match_gt_shotmap.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
+<iframe src="../assets/2020-11-02-xG-timeline-table-competition-tutorial_files/BarRea_match_gt_shotmap.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 
 * [Full Image Link](https://rpubs.com/Ryo-N7/barca-realmadrid-gt-table)
 
@@ -1055,7 +1060,7 @@ We can run the same function for other matches from understat. You can modify th
 
 ## Inter Milan vs. Fiorentina
 
-<iframe src="../assets/2020-10-31-xG-timeline-table-competition-tutorial_files/IntFio_match_gt_shotmap.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
+<iframe src="../assets/2020-11-02-xG-timeline-table-competition-tutorial_files/IntFio_match_gt_shotmap.html" width="100%" height="500" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 
 * [Full Image Link](https://rpubs.com/Ryo-N7/inter-fiorentina-gt-table)
 
@@ -1065,7 +1070,7 @@ We can run the same function for other matches from understat. You can modify th
 
 * [Ewen Henderson](https://twitter.com/ewen_/) for the [{understatr}](https://github.com/ewenme/understatr) package.
 
-* [Rich Iannone](https://twitter.com/riannone) for the [{gt}]() package.
+* [Rich Iannone](https://twitter.com/riannone) for the [{gt}](https://github.com/rstudio/gt) package.
 
 * [Joe Gallagher](https://twitter.com/joedgallagher) for the R code for adjusting xG per possession sequence.
 
@@ -1077,7 +1082,18 @@ We can run the same function for other matches from understat. You can modify th
 
 # Conclusion & Future Steps
 
-This blog post was a tutorial for how to create xG and shot time lines using data from [understat.com](https://understat.com/). I also described the data source and my design choices along with the code breakdowns. 
+This blog post was a tutorial for how to create xG and shot time lines using data from [understat.com](https://understat.com/). I also described the data source and my design choices along with a code breakdown. Using the code available you can try to make your own or even modify the code so that you can create these tables using other data sources that you may have access to. 
 
-Writing up this blog post also helped me re-factor my code, so a good chunk of the stuff you saw above are going to be incorporated into my own scripts in some shape or another in the near future! Admittedly, the code here is still very messy as I'm taking out and switching things around from my usual scripts. Also, I've tried to break stuff up quite a bit so I can explain the code better. It can 100% be improved but hopefully I've given you enough to start experimenting! 
+Writing up this blog post also helped me re-factor my code, so a good chunk of the stuff you saw above are going to be incorporated into my own scripts in some shape or another in the near future! 
+
+If you made it all the way through, thanks for reading and happy coding!
+
+* [R Table Viz Competition Submission Thread](https://community.rstudio.com/t/expected-goals-xg-shot-timeline-for-soccer-football-with-gt-table-contest-submission/86449)
+
+* [socer_ggplots](https://github.com/Ryo-N7/soccer_ggplots): Github Repo for other soccer viz examples using R
+
+* Links to {gt} examples shown in the blog post: [Inter vs. Fiorentina](https://rpubs.com/Ryo-N7/inter-fiorentina-gt-table), [Barcelona vs. Real Madrid](https://rpubs.com/Ryo-N7/barca-realmadrid-gt-table), [Liverpool vs. Leeds United](https://rpubs.com/Ryo-N7/lfc-leeds-gt-table)
+
+* [soccer_gt_timeline](https://github.com/Ryo-N7/soccer_gt_timelines): Github repo of this tutorial and other examples.
+
 
